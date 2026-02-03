@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane prefHeight="600.0" prefWidth="1000.0" xmlns="http://javafx.com/javafx/11" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.warehousequery.app.controller.MainController">
+    <top>
+        <VBox spacing="5">
+            <padding>
+                <Insets top="10" right="10" bottom="10" left="10"/>
+            </padding>
+
+            <MenuBar>
+                <Menu text="导出">
+                    <MenuItem fx:id="exportSelectedMenuItem" text="导出选中行"/>
+                </Menu>
+                <Menu text="列配置">
+                    <MenuItem fx:id="columnConfigMenuItem" text="列显示设置"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem fx:id="saveColumnConfigMenuItem" text="保存当前列配置"/>
+                    <MenuItem fx:id="resetColumnConfigMenuItem" text="重置列配置"/>
+                </Menu>
+                <Menu text="查看">
+                    <CheckMenuItem fx:id="showHeadersMenuItem" text="显示表头编辑按钮" selected="true"/>
+                </Menu>
+            </MenuBar>
+
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Label text="进仓编号:"/>
+                <TextField fx:id="jcbhTextField" prefWidth="180"/>
+                <Label text="多个进仓编号用逗号或空格分开" textFill="RED"/>
+                
+                <Label text="状态:"/>
+                <ComboBox fx:id="statusComboBox" prefWidth="100"/>
+                
+                <DatePicker fx:id="startDatePicker" prefWidth="120"/>
+                <Label text="至"/>
+                <DatePicker fx:id="endDatePicker" prefWidth="120"/>
+                
+                <Button fx:id="queryButton" text="查询"/>
+                
+                <Button fx:id="webVersionButton" text="网页版"/>
+                
+                <Button fx:id="exportSelectedButton" text="导出选中数据"/>
+            </HBox>
+            
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <ProgressBar fx:id="progressBar" prefWidth="300" visible="false"/>
+                <Label fx:id="progressLabel" visible="false"/>
+            </HBox>
+            
+            <HBox>
+                <Label fx:id="queryResultLabel" textFill="BLUE"/>
+            </HBox>
+        </VBox>
+    </top>
+    
+    <center>
+        <TableView fx:id="resultTableView" VBox.vgrow="ALWAYS"/>
+    </center>
+    
+    <bottom>
+        <VBox spacing="5">
+            <padding>
+                <Insets top="5" right="10" bottom="10" left="10"/>
+            </padding>
+            
+            <HBox spacing="20" alignment="CENTER_LEFT">
+                <Label text="总计 件数:"/>
+                <Label fx:id="totalJsLabel" text="0"/>
+                
+                <Label text="体积:"/>
+                <Label fx:id="totalTjLabel" text="0.00"/>
+                
+                <Label text="库存体积:"/>
+                <Label fx:id="totalKctjLabel" text="0.00"/>
+                
+                <Label text="毛重:"/>
+                <Label fx:id="totalMzLabel" text="0.00"/>
+                
+                <Label text="库存件数:"/>
+                <Label fx:id="totalKcjsLabel" text="0.00"/>
+            </HBox>
+            
+            <VBox fx:id="selectedTotalsBox" visible="false" managed="false">
+                <HBox spacing="20" alignment="CENTER_LEFT">
+                    <Label text="选中行:" style="-fx-font-weight: bold;"/>
+                    <Label fx:id="selectedRowsCountLabel" text="0" style="-fx-font-weight: bold;"/>
+                    
+                    <Label text="件数:"/>
+                    <Label fx:id="selectedJsLabel" text="0"/>
+                    
+                    <Label text="体积:"/>
+                    <Label fx:id="selectedTjLabel" text="0.00"/>
+                    
+                    <Label text="库存体积:"/>
+                    <Label fx:id="selectedKctjLabel" text="0.00"/>
+                    
+                    <Label text="毛重:"/>
+                    <Label fx:id="selectedMzLabel" text="0.00"/>
+                    
+                    <Label text="库存件数:"/>
+                    <Label fx:id="selectedKcjsLabel" text="0.00"/>
+                </HBox>
+            </VBox>
+        </VBox>
+    </bottom>
+</BorderPane> 
