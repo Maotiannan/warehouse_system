@@ -1,97 +1,191 @@
+/*
+ * Decompiled with CFR 0.152.
+ */
 package com.warehousequery.app.model;
 
-/**
- * 简化的仓库条目类 - 不依赖JavaFX
- */
 public class SimpleWarehouseEntry {
-    private String jcbh; // 进仓编号
-    private String jczyh; // 进仓作业号
-    private String yjrq; // 预进日期
-    private String jcrq; // 进仓日期
-    private String lf; // L/F
-    private String bzgg; // 包装规格
-    private String hwmc; // 货物名称
-    private String mt; // 唛头
-    private String hh; // 货号
-    private int js; // 件数
-    private double tj; // 体积
-    private double kctj; // 库存体积
-    private double mz; // 毛重
-    private int ts; // 托数
-    private String shdw; // 送货单位
-    private double kcjs; // 库存件数
-    private String bgzt; // 报关状态
-    private String bz; // 备注
-    private String jcid; // 进仓ID（用于查看照片和托信息）
+    private String jcbh;
+    private String jczyh;
+    private String yjrq;
+    private String jcrq;
+    private String lf;
+    private String bzgg;
+    private String hwmc;
+    private String mt;
+    private String hh;
+    private int js;
+    private double tj;
+    private double kctj;
+    private double mz;
+    private int ts;
+    private String shdw;
+    private double kcjs;
+    private String bgzt;
+    private String bz;
+    private String jcid;
     private boolean selected = false;
 
-    // 构造函数
-    public SimpleWarehouseEntry() {}
-
-    // Getter和Setter方法
-    public String getJcbh() { return jcbh; }
-    public void setJcbh(String jcbh) { this.jcbh = jcbh; }
-
-    public String getJczyh() { return jczyh; }
-    public void setJczyh(String jczyh) { this.jczyh = jczyh; }
-
-    public String getYjrq() { return yjrq; }
-    public void setYjrq(String yjrq) { this.yjrq = yjrq; }
-
-    public String getJcrq() { return jcrq; }
-    public void setJcrq(String jcrq) { this.jcrq = jcrq; }
-
-    public String getLf() { return lf; }
-    public void setLf(String lf) { this.lf = lf; }
-
-    public String getBzgg() { return bzgg; }
-    public void setBzgg(String bzgg) { this.bzgg = bzgg; }
-
-    public String getHwmc() { return hwmc; }
-    public void setHwmc(String hwmc) { this.hwmc = hwmc; }
-
-    public String getMt() { return mt; }
-    public void setMt(String mt) { this.mt = mt; }
-
-    public String getHh() { return hh; }
-    public void setHh(String hh) { this.hh = hh; }
-
-    public int getJs() { return js; }
-    public void setJs(int js) { this.js = js; }
-
-    public double getTj() { return tj; }
-    public void setTj(double tj) { this.tj = tj; }
-
-    public double getKctj() { return kctj; }
-    public void setKctj(double kctj) { this.kctj = kctj; }
-
-    public double getMz() { return mz; }
-    public void setMz(double mz) { this.mz = mz; }
-
-    public int getTs() { return ts; }
-    public void setTs(int ts) { this.ts = ts; }
-
-    public String getShdw() { return shdw; }
-    public void setShdw(String shdw) { this.shdw = shdw; }
-
-    public double getKcjs() { return kcjs; }
-    public void setKcjs(double kcjs) { this.kcjs = kcjs; }
-
-    public String getBgzt() { return bgzt; }
-    public void setBgzt(String bgzt) { this.bgzt = bgzt; }
-
-    public String getBz() { return bz; }
-    public void setBz(String bz) { this.bz = bz; }
-
-    public String getJcid() { return jcid; }
-    public void setJcid(String jcid) { this.jcid = jcid; }
-
-    public boolean isSelected() { return selected; }
-    public void setSelected(boolean selected) { this.selected = selected; }
-
-    @Override
-    public String toString() {
-        return String.format("进仓编号: %s, 货物名称: %s, 件数: %d, 状态: %s", 
-                           jcbh, hwmc, js, bgzt);
+    public String getJcbh() {
+        return this.jcbh;
     }
-} 
+
+    public void setJcbh(String jcbh) {
+        this.jcbh = jcbh;
+    }
+
+    public String getJczyh() {
+        return this.jczyh;
+    }
+
+    public void setJczyh(String jczyh) {
+        this.jczyh = jczyh;
+    }
+
+    public String getYjrq() {
+        return this.yjrq;
+    }
+
+    public void setYjrq(String yjrq) {
+        this.yjrq = yjrq;
+    }
+
+    public String getJcrq() {
+        return this.jcrq;
+    }
+
+    public void setJcrq(String jcrq) {
+        this.jcrq = jcrq;
+    }
+
+    public String getLf() {
+        return this.lf;
+    }
+
+    public void setLf(String lf) {
+        this.lf = lf;
+    }
+
+    public String getBzgg() {
+        return this.bzgg;
+    }
+
+    public void setBzgg(String bzgg) {
+        this.bzgg = bzgg;
+    }
+
+    public String getHwmc() {
+        return this.hwmc;
+    }
+
+    public void setHwmc(String hwmc) {
+        this.hwmc = hwmc;
+    }
+
+    public String getMt() {
+        return this.mt;
+    }
+
+    public void setMt(String mt) {
+        this.mt = mt;
+    }
+
+    public String getHh() {
+        return this.hh;
+    }
+
+    public void setHh(String hh) {
+        this.hh = hh;
+    }
+
+    public int getJs() {
+        return this.js;
+    }
+
+    public void setJs(int js) {
+        this.js = js;
+    }
+
+    public double getTj() {
+        return this.tj;
+    }
+
+    public void setTj(double tj) {
+        this.tj = tj;
+    }
+
+    public double getKctj() {
+        return this.kctj;
+    }
+
+    public void setKctj(double kctj) {
+        this.kctj = kctj;
+    }
+
+    public double getMz() {
+        return this.mz;
+    }
+
+    public void setMz(double mz) {
+        this.mz = mz;
+    }
+
+    public int getTs() {
+        return this.ts;
+    }
+
+    public void setTs(int ts) {
+        this.ts = ts;
+    }
+
+    public String getShdw() {
+        return this.shdw;
+    }
+
+    public void setShdw(String shdw) {
+        this.shdw = shdw;
+    }
+
+    public double getKcjs() {
+        return this.kcjs;
+    }
+
+    public void setKcjs(double kcjs) {
+        this.kcjs = kcjs;
+    }
+
+    public String getBgzt() {
+        return this.bgzt;
+    }
+
+    public void setBgzt(String bgzt) {
+        this.bgzt = bgzt;
+    }
+
+    public String getBz() {
+        return this.bz;
+    }
+
+    public void setBz(String bz) {
+        this.bz = bz;
+    }
+
+    public String getJcid() {
+        return this.jcid;
+    }
+
+    public void setJcid(String jcid) {
+        this.jcid = jcid;
+    }
+
+    public boolean isSelected() {
+        return this.selected;
+    }
+
+    public void setSelected(boolean selected) {
+        this.selected = selected;
+    }
+
+    public String toString() {
+        return String.format("\u8fdb\u4ed3\u7f16\u53f7: %s, \u8d27\u7269\u540d\u79f0: %s, \u4ef6\u6570: %d, \u72b6\u6001: %s", this.jcbh, this.hwmc, this.js, this.bgzt);
+    }
+}

@@ -4,7 +4,7 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<BorderPane prefHeight="600.0" prefWidth="1000.0" xmlns="http://javafx.com/javafx/11" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.warehousequery.app.controller.MainController">
+<BorderPane prefHeight="600.0" prefWidth="1000.0" xmlns="http://javafx.com/javafx/11" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.warehousequery.app.controller.MainController" stylesheets="@styles/app-theme.css" styleClass="app-root">
     <top>
         <VBox spacing="5">
             <padding>
@@ -12,8 +12,18 @@
             </padding>
 
             <MenuBar>
-                <Menu text="导出">
-                    <MenuItem fx:id="exportSelectedMenuItem" text="导出选中行"/>
+                <Menu text="文件">
+                    <MenuItem fx:id="queryMenuItem" text="执行查询 (Ctrl+Enter)" accelerator="Ctrl+Enter"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem fx:id="exportMenuItem" text="导出当前结果 (Ctrl+Shift+E)" accelerator="Ctrl+Shift+E"/>
+                    <MenuItem fx:id="exportSelectedMenuItem" text="导出选中行 (Ctrl+E)" accelerator="Ctrl+E"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem fx:id="viewLogsMenuItem" text="查看日志"/>
+                    <MenuItem fx:id="exitMenuItem" text="退出 (Ctrl+Q)" accelerator="Ctrl+Q"/>
+                </Menu>
+                <Menu text="查看">
+                    <MenuItem fx:id="calcSumMenuItem" text="统计汇总 (Alt+S)" accelerator="Alt+S"/>
+                    <CheckMenuItem fx:id="showHeadersMenuItem" text="显示表头编辑按钮" selected="true"/>
                 </Menu>
                 <Menu text="列配置">
                     <MenuItem fx:id="columnConfigMenuItem" text="列显示设置"/>
@@ -21,31 +31,89 @@
                     <MenuItem fx:id="saveColumnConfigMenuItem" text="保存当前列配置"/>
                     <MenuItem fx:id="resetColumnConfigMenuItem" text="重置列配置"/>
                 </Menu>
-                <Menu text="查看">
-                    <CheckMenuItem fx:id="showHeadersMenuItem" text="显示表头编辑按钮" selected="true"/>
-                </Menu>
             </MenuBar>
 
-            <HBox spacing="10" alignment="CENTER_LEFT">
-                <Label text="进仓编号:"/>
-                <TextField fx:id="jcbhTextField" prefWidth="180"/>
-                <Label text="多个进仓编号用逗号或空格分开" textFill="RED"/>
-                
-                <Label text="状态:"/>
-                <ComboBox fx:id="statusComboBox" prefWidth="100"/>
-                
-                <DatePicker fx:id="startDatePicker" prefWidth="120"/>
-                <Label text="至"/>
-                <DatePicker fx:id="endDatePicker" prefWidth="120"/>
-                
-                <Button fx:id="queryButton" text="查询"/>
-                
+            <ToolBar styleClass="app-toolbar">
+                <Button fx:id="queryButton" text="查询">
+                    <tooltip><Tooltip text="Ctrl+Enter"/></tooltip>
+                </Button>
+                <Button fx:id="exportButton" text="导出结果">
+                    <tooltip><Tooltip text="Ctrl+Shift+E"/></tooltip>
+                </Button>
+                <Button fx:id="exportSelectedButton" text="导出选中">
+                    <tooltip><Tooltip text="Ctrl+E"/></tooltip>
+                </Button>
+                <Separator/>
+                <ToggleButton fx:id="advancedToggleButton" text="高级筛选"/>
+                <Separator/>
                 <Button fx:id="webVersionButton" text="网页版"/>
-                
-                <Button fx:id="exportSelectedButton" text="导出选中数据"/>
-            </HBox>
+                <Button fx:id="viewLogsButton" text="查看日志"/>
+            </ToolBar>
+
+            <VBox spacing="6">
+                <FlowPane fx:id="filterPane" hgap="12" vgap="8" prefWrapLength="960" styleClass="filter-pane">
+                    <Label text="进仓编号:"/>
+                    <TextField fx:id="jcbhTextField" prefWidth="220" promptText="支持多个编号"/>
+                    <Label text="多个编号请用逗号或空格分隔" style="-fx-text-fill: #c0392b; -fx-font-size: 11px;"/>
+
+                    <Label text="状态:"/>
+                    <ComboBox fx:id="statusComboBox" prefWidth="120"/>
+
+                    <Label text="日期范围:"/>
+                    <DatePicker fx:id="startDatePicker" prefWidth="140"/>
+                    <Label text="至"/>
+                    <DatePicker fx:id="endDatePicker" prefWidth="140"/>
+
+                </FlowPane>
+
+                <TitledPane fx:id="advancedFilterPane" text="高级筛选" expanded="false" styleClass="advanced-pane">
+                    <content>
+                        <GridPane hgap="12" vgap="8">
+                            <padding>
+                                <Insets top="10" right="10" bottom="10" left="10"/>
+                            </padding>
+                            <columnConstraints>
+                                <ColumnConstraints halignment="RIGHT" minWidth="80"/>
+                                <ColumnConstraints prefWidth="180" hgrow="ALWAYS"/>
+                                <ColumnConstraints halignment="RIGHT" minWidth="80"/>
+                                <ColumnConstraints prefWidth="180" hgrow="ALWAYS"/>
+                            </columnConstraints>
+
+                            <Label text="作业号:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                            <TextField fx:id="jobNumberTextField" promptText="作业号/进仓作业号" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+                            <Label text="进仓编号:" GridPane.rowIndex="0" GridPane.columnIndex="2"/>
+                            <TextField fx:id="entryNumberTextField" promptText="进仓编号" GridPane.rowIndex="0" GridPane.columnIndex="3"/>
+
+                            <Label text="货主:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                            <TextField fx:id="ownerTextField" promptText="货主" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+                            <Label text="唛头:" GridPane.rowIndex="1" GridPane.columnIndex="2"/>
+                            <TextField fx:id="markTextField" promptText="唛头 (精确匹配，可多值)" GridPane.rowIndex="1" GridPane.columnIndex="3"/>
+
+                            <Label text="货物名称:" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                            <TextField fx:id="cargoTextField" promptText="货物名称 (模糊)" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+
+                            <Label text="包装规格:" GridPane.rowIndex="2" GridPane.columnIndex="2"/>
+                            <TextField fx:id="packageTextField" promptText="包装规格 (模糊)" GridPane.rowIndex="2" GridPane.columnIndex="3"/>
+
+                            <Label text="车号:" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+                            <TextField fx:id="plateTextField" promptText="车号 (模糊，可多值)" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+
+                            <Label text="司机电话:" GridPane.rowIndex="3" GridPane.columnIndex="2"/>
+                            <TextField fx:id="driverPhoneTextField" promptText="司机电话 (模糊，可多值)" GridPane.rowIndex="3" GridPane.columnIndex="3"/>
+                        </GridPane>
+                    </content>
+                    <graphic>
+                        <HBox spacing="8" alignment="CENTER_RIGHT">
+                            <Label text="高级筛选"/>
+                            <Button fx:id="resetFiltersButton" text="清空高级筛选"/>
+                        </HBox>
+                    </graphic>
+                </TitledPane>
+            </VBox>
             
-            <HBox spacing="10" alignment="CENTER_LEFT">
+            <HBox spacing="10" alignment="CENTER_LEFT" styleClass="status-strip">
                 <ProgressBar fx:id="progressBar" prefWidth="300" visible="false"/>
                 <Label fx:id="progressLabel" visible="false"/>
             </HBox>
@@ -57,7 +125,13 @@
     </top>
     
     <center>
-        <TableView fx:id="resultTableView" VBox.vgrow="ALWAYS"/>
+        <StackPane>
+            <TableView fx:id="resultTableView" VBox.vgrow="ALWAYS"/>
+            <VBox fx:id="queryOverlay" alignment="CENTER" spacing="10" visible="false" managed="false" style="-fx-background-color: rgba(255,255,255,0.9);">
+                <ProgressIndicator />
+                <Label fx:id="overlayMessageLabel" text="正在查询..." style="-fx-font-size: 14px; -fx-text-fill: #2c3e50;"/>
+            </VBox>
+        </StackPane>
     </center>
     
     <bottom>
@@ -66,7 +140,7 @@
                 <Insets top="5" right="10" bottom="10" left="10"/>
             </padding>
             
-            <HBox spacing="20" alignment="CENTER_LEFT">
+            <HBox spacing="20" alignment="CENTER_LEFT" styleClass="summary-panel">
                 <Label text="总计 件数:"/>
                 <Label fx:id="totalJsLabel" text="0"/>
                 

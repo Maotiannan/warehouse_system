@@ -1,11 +1,12 @@
+/*
+ * Decompiled with CFR 0.152.
+ */
 package com.warehousequery.app;
 
-/**
- * 应用程序启动器
- */
+import com.warehousequery.app.MainApp;
+
 public class Launcher {
     public static void main(String[] args) {
-        // 启动JavaFX应用程序
         MainApp.main(args);
     }
-} 
+}

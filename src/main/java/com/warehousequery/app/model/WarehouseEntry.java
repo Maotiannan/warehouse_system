@@ -9,284 +9,220 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 
-/**
- * 表示仓库条目的数据模型
- */
 public class WarehouseEntry {
-    private final StringProperty jcbh; // 进仓编号
-    private final StringProperty jczyh; // 进仓作业号
-    private final StringProperty zyh; // 作业号（API字段名）
-    private final StringProperty yjrq; // 预进日期
-    private final StringProperty jcrq; // 进仓日期
-    private final StringProperty lf; // L/F
-    private final StringProperty bzgg; // 包装规格
-    private final StringProperty hwmc; // 货物名称
-    private final StringProperty mt; // 唛头
-    private final StringProperty hh; // 货号
-    private final IntegerProperty js; // 件数
-    private final DoubleProperty tj; // 体积
-    private final DoubleProperty kctj; // 库存体积
-    private final DoubleProperty mz; // 毛重
-    private final IntegerProperty ts; // 托数
-    private final StringProperty shdw; // 送货单位
-    private final DoubleProperty kcjs; // 库存件数
-    private final StringProperty bgzt; // 报关状态
-    private final StringProperty bz; // 备注
-    private final StringProperty jcid; // 进仓ID（用于查看照片和托信息）
-    
-    // 预约进仓状态专用字段
-    private final StringProperty yyh; // 预约号
-    private final StringProperty srrq; // 录入日期
-    private final StringProperty hd; // 货代
-    private final StringProperty ch; // 车牌号
-    private final StringProperty jsy; // 司机
-    private final StringProperty jsydh; // 司机电话
-    private final StringProperty fgsmc; // 分公司名称
-    private final StringProperty yqqdsj; // 要求取单时间
-    
-    // 30个字段完整版本新增字段
-    private final StringProperty hz; // 货主
-    private final IntegerProperty yjjs; // 预计件数
-    private final DoubleProperty yjtj; // 预计体积
-    private final DoubleProperty yjmz; // 预计毛重
-    private final DoubleProperty kcmz; // 库存毛重
-    private final StringProperty xhrq; // 卸货日期
-    private final StringProperty xhrq2; // 卸货完成
-    private final StringProperty hwmc1; // 货物名称1
-    private final StringProperty driverdh; // 司机电话（API字段名）
-    private final StringProperty cleng; // 车长
-    private final StringProperty chengzhong; // 承重
-    private final StringProperty bz2; // 备注2
-    private final StringProperty hdmc; // 货代名称
-    
-    // 选中状态属性
-    private BooleanProperty selected = new SimpleBooleanProperty(false);
-    
-    public WarehouseEntry() {
-        this.jcbh = new SimpleStringProperty("");
-        this.jczyh = new SimpleStringProperty("");
-        this.zyh = new SimpleStringProperty("");
-        this.yjrq = new SimpleStringProperty("");
-        this.jcrq = new SimpleStringProperty("");
-        this.lf = new SimpleStringProperty("");
-        this.bzgg = new SimpleStringProperty("");
-        this.hwmc = new SimpleStringProperty("");
-        this.mt = new SimpleStringProperty("");
-        this.hh = new SimpleStringProperty("");
-        this.js = new SimpleIntegerProperty(0);
-        this.tj = new SimpleDoubleProperty(0);
-        this.kctj = new SimpleDoubleProperty(0);
-        this.mz = new SimpleDoubleProperty(0);
-        this.ts = new SimpleIntegerProperty(0);
-        this.shdw = new SimpleStringProperty("");
-        this.kcjs = new SimpleDoubleProperty(0);
-        this.bgzt = new SimpleStringProperty("");
-        this.bz = new SimpleStringProperty("");
-        this.jcid = new SimpleStringProperty("");
-        
-        // 预约进仓专用字段初始化
-        this.yyh = new SimpleStringProperty("");
-        this.srrq = new SimpleStringProperty("");
-        this.hd = new SimpleStringProperty("");
-        this.ch = new SimpleStringProperty("");
-        this.jsy = new SimpleStringProperty("");
-        this.jsydh = new SimpleStringProperty("");
-        this.fgsmc = new SimpleStringProperty("");
-        this.yqqdsj = new SimpleStringProperty("");
-        
-        // 30个字段完整版本新增字段初始化
-        this.hz = new SimpleStringProperty("");
-        this.yjjs = new SimpleIntegerProperty(0);
-        this.yjtj = new SimpleDoubleProperty(0);
-        this.yjmz = new SimpleDoubleProperty(0);
-        this.kcmz = new SimpleDoubleProperty(0);
-        this.xhrq = new SimpleStringProperty("");
-        this.xhrq2 = new SimpleStringProperty("");
-        this.hwmc1 = new SimpleStringProperty("");
-        this.driverdh = new SimpleStringProperty("");
-        this.cleng = new SimpleStringProperty("");
-        this.chengzhong = new SimpleStringProperty("");
-        this.bz2 = new SimpleStringProperty("");
-        this.hdmc = new SimpleStringProperty("");
-    }
-    
-    // Getters and Setters
+    private final StringProperty jcbh = new SimpleStringProperty("");
+    private final StringProperty jczyh = new SimpleStringProperty("");
+    private final StringProperty zyh = new SimpleStringProperty("");
+    private final StringProperty yjrq = new SimpleStringProperty("");
+    private final StringProperty jcrq = new SimpleStringProperty("");
+    private final StringProperty lf = new SimpleStringProperty("");
+    private final StringProperty bzgg = new SimpleStringProperty("");
+    private final StringProperty hwmc = new SimpleStringProperty("");
+    private final StringProperty mt = new SimpleStringProperty("");
+    private final StringProperty hh = new SimpleStringProperty("");
+    private final IntegerProperty js = new SimpleIntegerProperty(0);
+    private final DoubleProperty tj = new SimpleDoubleProperty(0.0);
+    private final DoubleProperty kctj = new SimpleDoubleProperty(0.0);
+    private final DoubleProperty mz = new SimpleDoubleProperty(0.0);
+    private final IntegerProperty ts = new SimpleIntegerProperty(0);
+    private final StringProperty shdw = new SimpleStringProperty("");
+    private final DoubleProperty kcjs = new SimpleDoubleProperty(0.0);
+    private final StringProperty bgzt = new SimpleStringProperty("");
+    private final StringProperty bz = new SimpleStringProperty("");
+    private final StringProperty jcid = new SimpleStringProperty("");
+    private final StringProperty inguid = new SimpleStringProperty("");
+    private final StringProperty yyh = new SimpleStringProperty("");
+    private final StringProperty srrq = new SimpleStringProperty("");
+    private final StringProperty hd = new SimpleStringProperty("");
+    private final StringProperty ch = new SimpleStringProperty("");
+    private final StringProperty jsy = new SimpleStringProperty("");
+    private final StringProperty jsydh = new SimpleStringProperty("");
+    private final StringProperty fgsmc = new SimpleStringProperty("");
+    private final StringProperty yqqdsj = new SimpleStringProperty("");
+    private final StringProperty hz = new SimpleStringProperty("");
+    private final IntegerProperty yjjs = new SimpleIntegerProperty(0);
+    private final DoubleProperty yjtj = new SimpleDoubleProperty(0.0);
+    private final DoubleProperty yjmz = new SimpleDoubleProperty(0.0);
+    private final DoubleProperty kcmz = new SimpleDoubleProperty(0.0);
+    private final StringProperty xhrq = new SimpleStringProperty("");
+    private final StringProperty xhrq2 = new SimpleStringProperty("");
+    private final StringProperty hwmc1 = new SimpleStringProperty("");
+    private final StringProperty driverdh = new SimpleStringProperty("");
+    private final StringProperty cleng = new SimpleStringProperty("");
+    private final StringProperty chengzhong = new SimpleStringProperty("");
+    private final StringProperty bz2 = new SimpleStringProperty("");
+    private final StringProperty hdmc = new SimpleStringProperty("");
+    private final BooleanProperty selected = new SimpleBooleanProperty(false);
+
     public String getJcbh() { return jcbh.get(); }
     public StringProperty jcbhProperty() { return jcbh; }
-    public void setJcbh(String jcbh) { this.jcbh.set(jcbh); }
+    public void setJcbh(String value) { jcbh.set(value); }
 
     public String getJczyh() { return jczyh.get(); }
     public StringProperty jczyhProperty() { return jczyh; }
-    public void setJczyh(String jczyh) { this.jczyh.set(jczyh); }
+    public void setJczyh(String value) { jczyh.set(value); }
 
     public String getZyh() { return zyh.get(); }
     public StringProperty zyhProperty() { return zyh; }
-    public void setZyh(String zyh) { this.zyh.set(zyh); }
+    public void setZyh(String value) { zyh.set(value); }
 
     public String getYjrq() { return yjrq.get(); }
     public StringProperty yjrqProperty() { return yjrq; }
-    public void setYjrq(String yjrq) { this.yjrq.set(yjrq); }
+    public void setYjrq(String value) { yjrq.set(value); }
 
     public String getJcrq() { return jcrq.get(); }
     public StringProperty jcrqProperty() { return jcrq; }
-    public void setJcrq(String jcrq) { this.jcrq.set(jcrq); }
+    public void setJcrq(String value) { jcrq.set(value); }
 
     public String getLf() { return lf.get(); }
     public StringProperty lfProperty() { return lf; }
-    public void setLf(String lf) { this.lf.set(lf); }
+    public void setLf(String value) { lf.set(value); }
 
     public String getBzgg() { return bzgg.get(); }
     public StringProperty bzggProperty() { return bzgg; }
-    public void setBzgg(String bzgg) { this.bzgg.set(bzgg); }
+    public void setBzgg(String value) { bzgg.set(value); }
 
     public String getHwmc() { return hwmc.get(); }
     public StringProperty hwmcProperty() { return hwmc; }
-    public void setHwmc(String hwmc) { this.hwmc.set(hwmc); }
+    public void setHwmc(String value) { hwmc.set(value); }
 
     public String getMt() { return mt.get(); }
     public StringProperty mtProperty() { return mt; }
-    public void setMt(String mt) { this.mt.set(mt); }
+    public void setMt(String value) { mt.set(value); }
 
     public String getHh() { return hh.get(); }
     public StringProperty hhProperty() { return hh; }
-    public void setHh(String hh) { this.hh.set(hh); }
+    public void setHh(String value) { hh.set(value); }
 
     public int getJs() { return js.get(); }
     public IntegerProperty jsProperty() { return js; }
-    public void setJs(int js) { this.js.set(js); }
+    public void setJs(int value) { js.set(value); }
 
     public double getTj() { return tj.get(); }
     public DoubleProperty tjProperty() { return tj; }
-    public void setTj(double tj) { this.tj.set(tj); }
+    public void setTj(double value) { tj.set(value); }
 
     public double getKctj() { return kctj.get(); }
     public DoubleProperty kctjProperty() { return kctj; }
-    public void setKctj(double kctj) { this.kctj.set(kctj); }
+    public void setKctj(double value) { kctj.set(value); }
 
     public double getMz() { return mz.get(); }
     public DoubleProperty mzProperty() { return mz; }
-    public void setMz(double mz) { this.mz.set(mz); }
+    public void setMz(double value) { mz.set(value); }
 
     public int getTs() { return ts.get(); }
     public IntegerProperty tsProperty() { return ts; }
-    public void setTs(int ts) { this.ts.set(ts); }
+    public void setTs(int value) { ts.set(value); }
 
     public String getShdw() { return shdw.get(); }
     public StringProperty shdwProperty() { return shdw; }
-    public void setShdw(String shdw) { this.shdw.set(shdw); }
+    public void setShdw(String value) { shdw.set(value); }
 
     public double getKcjs() { return kcjs.get(); }
     public DoubleProperty kcjsProperty() { return kcjs; }
-    public void setKcjs(double kcjs) { this.kcjs.set(kcjs); }
+    public void setKcjs(double value) { kcjs.set(value); }
 
     public String getBgzt() { return bgzt.get(); }
     public StringProperty bgztProperty() { return bgzt; }
-    public void setBgzt(String bgzt) { this.bgzt.set(bgzt); }
+    public void setBgzt(String value) { bgzt.set(value); }
 
     public String getBz() { return bz.get(); }
     public StringProperty bzProperty() { return bz; }
-    public void setBz(String bz) { this.bz.set(bz); }
-    
+    public void setBz(String value) { bz.set(value); }
+
     public String getJcid() { return jcid.get(); }
     public StringProperty jcidProperty() { return jcid; }
-    public void setJcid(String jcid) { this.jcid.set(jcid); }
+    public void setJcid(String value) { jcid.set(value); }
 
-    // 预约进仓专用字段的Getters and Setters
+    public String getInguid() { return inguid.get(); }
+    public StringProperty inguidProperty() { return inguid; }
+    public void setInguid(String value) { inguid.set(value); }
+
     public String getYyh() { return yyh.get(); }
     public StringProperty yyhProperty() { return yyh; }
-    public void setYyh(String yyh) { this.yyh.set(yyh); }
+    public void setYyh(String value) { yyh.set(value); }
 
     public String getSrrq() { return srrq.get(); }
     public StringProperty srrqProperty() { return srrq; }
-    public void setSrrq(String srrq) { this.srrq.set(srrq); }
+    public void setSrrq(String value) { srrq.set(value); }
 
     public String getHd() { return hd.get(); }
     public StringProperty hdProperty() { return hd; }
-    public void setHd(String hd) { this.hd.set(hd); }
+    public void setHd(String value) { hd.set(value); }
 
     public String getCh() { return ch.get(); }
     public StringProperty chProperty() { return ch; }
-    public void setCh(String ch) { this.ch.set(ch); }
+    public void setCh(String value) { ch.set(value); }
 
     public String getJsy() { return jsy.get(); }
     public StringProperty jsyProperty() { return jsy; }
-    public void setJsy(String jsy) { this.jsy.set(jsy); }
+    public void setJsy(String value) { jsy.set(value); }
 
     public String getJsydh() { return jsydh.get(); }
     public StringProperty jsydhProperty() { return jsydh; }
-    public void setJsydh(String jsydh) { this.jsydh.set(jsydh); }
+    public void setJsydh(String value) { jsydh.set(value); }
 
     public String getFgsmc() { return fgsmc.get(); }
     public StringProperty fgsmcProperty() { return fgsmc; }
-    public void setFgsmc(String fgsmc) { this.fgsmc.set(fgsmc); }
+    public void setFgsmc(String value) { fgsmc.set(value); }
 
     public String getYqqdsj() { return yqqdsj.get(); }
     public StringProperty yqqdsjProperty() { return yqqdsj; }
-    public void setYqqdsj(String yqqdsj) { this.yqqdsj.set(yqqdsj); }
+    public void setYqqdsj(String value) { yqqdsj.set(value); }
 
-    // 选中状态的Getter/Setter/Property方法
-    public boolean isSelected() {
-        return selected.get();
-    }
-    
-    public void setSelected(boolean selected) {
-        this.selected.set(selected);
-    }
-    
-    public BooleanProperty selectedProperty() {
-        return selected;
-    }
-    
-    // 30个字段完整版本新增字段的Getters and Setters
+    public boolean isSelected() { return selected.get(); }
+    public BooleanProperty selectedProperty() { return selected; }
+    public void setSelected(boolean value) { selected.set(value); }
+
     public String getHz() { return hz.get(); }
     public StringProperty hzProperty() { return hz; }
-    public void setHz(String hz) { this.hz.set(hz); }
+    public void setHz(String value) { hz.set(value); }
 
     public int getYjjs() { return yjjs.get(); }
     public IntegerProperty yjjsProperty() { return yjjs; }
-    public void setYjjs(int yjjs) { this.yjjs.set(yjjs); }
+    public void setYjjs(int value) { yjjs.set(value); }
 
     public double getYjtj() { return yjtj.get(); }
     public DoubleProperty yjtjProperty() { return yjtj; }
-    public void setYjtj(double yjtj) { this.yjtj.set(yjtj); }
+    public void setYjtj(double value) { yjtj.set(value); }
 
     public double getYjmz() { return yjmz.get(); }
     public DoubleProperty yjmzProperty() { return yjmz; }
-    public void setYjmz(double yjmz) { this.yjmz.set(yjmz); }
+    public void setYjmz(double value) { yjmz.set(value); }
 
     public double getKcmz() { return kcmz.get(); }
     public DoubleProperty kcmzProperty() { return kcmz; }
-    public void setKcmz(double kcmz) { this.kcmz.set(kcmz); }
+    public void setKcmz(double value) { kcmz.set(value); }
 
     public String getXhrq() { return xhrq.get(); }
     public StringProperty xhrqProperty() { return xhrq; }
-    public void setXhrq(String xhrq) { this.xhrq.set(xhrq); }
+    public void setXhrq(String value) { xhrq.set(value); }
 
     public String getXhrq2() { return xhrq2.get(); }
     public StringProperty xhrq2Property() { return xhrq2; }
-    public void setXhrq2(String xhrq2) { this.xhrq2.set(xhrq2); }
+    public void setXhrq2(String value) { xhrq2.set(value); }
 
     public String getHwmc1() { return hwmc1.get(); }
     public StringProperty hwmc1Property() { return hwmc1; }
-    public void setHwmc1(String hwmc1) { this.hwmc1.set(hwmc1); }
+    public void setHwmc1(String value) { hwmc1.set(value); }
 
     public String getDriverdh() { return driverdh.get(); }
     public StringProperty driverdhProperty() { return driverdh; }
-    public void setDriverdh(String driverdh) { this.driverdh.set(driverdh); }
+    public void setDriverdh(String value) { driverdh.set(value); }
 
     public String getCleng() { return cleng.get(); }
     public StringProperty clengProperty() { return cleng; }
-    public void setCleng(String cleng) { this.cleng.set(cleng); }
+    public void setCleng(String value) { cleng.set(value); }
 
     public String getChengzhong() { return chengzhong.get(); }
     public StringProperty chengzhongProperty() { return chengzhong; }
-    public void setChengzhong(String chengzhong) { this.chengzhong.set(chengzhong); }
+    public void setChengzhong(String value) { chengzhong.set(value); }
 
     public String getBz2() { return bz2.get(); }
     public StringProperty bz2Property() { return bz2; }
-    public void setBz2(String bz2) { this.bz2.set(bz2); }
+    public void setBz2(String value) { bz2.set(value); }
 
     public String getHdmc() { return hdmc.get(); }
     public StringProperty hdmcProperty() { return hdmc; }
-    public void setHdmc(String hdmc) { this.hdmc.set(hdmc); }
-} 
+    public void setHdmc(String value) { hdmc.set(value); }
+}

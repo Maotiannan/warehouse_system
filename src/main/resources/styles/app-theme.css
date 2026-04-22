@@ -1,0 +1,84 @@
+.app-root {
+    -fx-font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+    -fx-background-color: linear-gradient(#f4f7fb, #eef2f7);
+}
+
+.app-toolbar {
+    -fx-background-color: #ffffff;
+    -fx-padding: 8 12;
+    -fx-spacing: 8;
+    -fx-border-color: transparent transparent rgba(0,0,0,0.08) transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.app-toolbar .button,
+.app-toolbar .toggle-button {
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-background-color: #246bfd;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.app-toolbar .toggle-button:selected {
+    -fx-background-color: #0d47a1;
+}
+
+.app-toolbar .button:hover,
+.app-toolbar .toggle-button:hover {
+    -fx-background-color: #1f5ad4;
+}
+
+.filter-pane {
+    -fx-padding: 12;
+    -fx-background-color: #ffffff;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-border-color: rgba(0,0,0,0.06);
+}
+
+.filter-pane .label {
+    -fx-text-fill: #2c3e50;
+    -fx-font-size: 13px;
+}
+
+.filter-pane .text-field,
+.filter-pane .combo-box,
+.filter-pane .date-picker {
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+}
+
+.advanced-pane {
+    -fx-padding: 0;
+}
+
+.advanced-pane > .content {
+    -fx-background-color: #fbfcff;
+}
+
+.advanced-pane .label {
+    -fx-text-fill: #22313f;
+}
+
+.status-strip {
+    -fx-padding: 8 12;
+    -fx-background-color: transparent;
+}
+
+.status-strip .label {
+    -fx-text-fill: #2c3e50;
+}
+
+.summary-panel {
+    -fx-padding: 10 14;
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: rgba(0,0,0,0.06);
+}
+
+.summary-panel .label {
+    -fx-text-fill: #2c3e50;
+    -fx-font-size: 13px;
+}
