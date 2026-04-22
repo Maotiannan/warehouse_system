@@ -4,7 +4,7 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<BorderPane prefHeight="600.0" prefWidth="1000.0" xmlns="http://javafx.com/javafx/11" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.warehousequery.app.controller.MainController" stylesheets="@styles/app-theme.css" styleClass="app-root">
+<BorderPane prefHeight="600.0" prefWidth="1000.0" xmlns="http://javafx.com/javafx/11" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.warehousequery.app.controller.MainController" stylesheets="@../styles/app-theme.css" styleClass="app-root">
     <top>
         <VBox spacing="5">
             <padding>
