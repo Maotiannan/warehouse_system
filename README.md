@@ -34,8 +34,9 @@
   `target/WarehouseQuerySystem-test.jar`
 - 运行压缩包：
   `target/WarehouseQuerySystem-runtime.zip`
-- Windows 安装包：
+- Windows 安装包本地构建输出：
   `target/installer/WarehouseQuerySystem-1.0.1.exe`
+- GitHub 仓库不再提交 `exe` 安装包，最新安装包统一放到 Releases
 
 ## 手动测试重点
 
