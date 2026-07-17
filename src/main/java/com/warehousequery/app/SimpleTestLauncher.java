@@ -20,12 +20,11 @@ public class SimpleTestLauncher {
         System.out.println("\u63a8\u8350\uff1aAzul Zulu JDK with JavaFX \u6216 BellSoft Liberica JDK Full");
         System.out.println("===============================================");
         System.out.println();
-        try (SimpleWarehouseService service = null;){
+        try (SimpleWarehouseService service = new SimpleWarehouseService()) {
             System.out.println("\u914d\u7f6e\u4fe1\u606f:");
             System.out.println("- API\u5730\u5740: " + AppConfig.getApiUrl());
             System.out.println("- \u5e94\u7528\u6807\u9898: \u4ed3\u5e93\u67e5\u8be2\u7cfb\u7edf");
             System.out.println();
-            service = new SimpleWarehouseService();
             System.out.println("\u2713 \u670d\u52a1\u521d\u59cb\u5316\u6210\u529f");
             System.out.println("\u6b63\u5728\u6d4b\u8bd5\u7f51\u7edc\u8fde\u63a5...");
             boolean connected = service.testConnection();

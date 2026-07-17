@@ -34,7 +34,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 
-public class SimpleWarehouseService {
+public class SimpleWarehouseService implements AutoCloseable {
     private HttpClient httpClient;
     private String sessionId;
 
@@ -114,6 +114,7 @@ public class SimpleWarehouseService {
         return results;
     }
 
+    @Override
     public void close() {
         try {
             if (this.httpClient != null) {

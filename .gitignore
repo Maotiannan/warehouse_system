@@ -1,5 +1,6 @@
 ﻿# Maven / Java build output
 /target/
+/dependency-reduced-pom.xml
 /dist/
 /temp_jpackage/
 
