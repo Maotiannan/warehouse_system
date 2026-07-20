@@ -14,6 +14,7 @@
 ## 近期设计
 
 - [分段查询与结果恢复设计](docs/superpowers/specs/2026-07-20-segmented-query-and-result-restore-design.md)
+- [分段查询与结果恢复实施计划](docs/superpowers/plans/2026-07-20-segmented-query-and-result-restore.md)
 
 ## 唛头本地编辑
 
