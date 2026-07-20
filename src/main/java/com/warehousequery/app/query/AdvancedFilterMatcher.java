@@ -56,7 +56,8 @@ public final class AdvancedFilterMatcher {
     private static boolean matchesField(WarehouseEntry entry, String key, List<String> terms) {
         switch (key) {
             case OWNER:
-                return matchesAnySubstring(entry.getHz(), terms);
+                return matchesAnySubstring(entry.getHz(), terms)
+                    || matchesAnySubstring(entry.getShdw(), terms);
             case ENTRY_NUMBER:
                 return matchesAnySubstring(entry.getJcbh(), terms);
             case JOB_NUMBER:
@@ -72,7 +73,8 @@ public final class AdvancedFilterMatcher {
             case PACKAGE:
                 return matchesAnySubstring(entry.getBzgg(), terms);
             case DRIVER_PHONE:
-                return matchesAnySubstring(entry.getJsydh(), terms);
+                return matchesAnySubstring(entry.getJsydh(), terms)
+                    || matchesAnySubstring(entry.getDriverdh(), terms);
             case MARK:
                 return matchesExact(entry.getMt(), terms);
             default:

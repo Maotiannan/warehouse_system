@@ -47,6 +47,17 @@ class AdvancedFilterMatcherTest {
             AdvancedFilterMatcher.CARGO, "棉,塑料")));
     }
 
+    @Test
+    void matchesOwnerAndDriverPhoneFromEitherMappedSourceField() {
+        WarehouseEntry entry = new WarehouseEntry();
+        entry.setShdw("备用货主");
+        entry.setDriverdh("13900000000");
+
+        assertTrue(AdvancedFilterMatcher.match(entry, Map.of(
+            AdvancedFilterMatcher.OWNER, "备用货主",
+            AdvancedFilterMatcher.DRIVER_PHONE, "1390")));
+    }
+
     private WarehouseEntry fixtureEntry() {
         WarehouseEntry entry = new WarehouseEntry();
         entry.setHz("货主甲");
