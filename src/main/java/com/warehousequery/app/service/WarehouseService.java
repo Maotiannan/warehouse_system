@@ -22,6 +22,13 @@ package com.warehousequery.app.service;
 
 import com.warehousequery.app.config.AppConfig;
 import com.warehousequery.app.model.WarehouseEntry;
+import com.warehousequery.app.query.QueryBatchRequest;
+import com.warehousequery.app.query.QueryBatchResult;
+import com.warehousequery.app.query.QueryBatchService;
+import com.warehousequery.app.query.QueryLogSink;
+import com.warehousequery.app.query.QueryMode;
+import com.warehousequery.app.query.QuerySegment;
+import com.warehousequery.app.query.SingleQueryClient;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
@@ -31,7 +38,9 @@ import java.nio.file.OpenOption;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -54,7 +63,7 @@ import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public class WarehouseService {
+public class WarehouseService implements SingleQueryClient {
     private static final String BASE_URL = "http://60.190.0.98:81";
     private static final String API_ENDPOINT = "/csccmisHandler/CsccmisHandler.ashx";
     private final CookieStore cookieStore = new BasicCookieStore();
@@ -85,7 +94,6 @@ public class WarehouseService {
             System.err.println("\u521d\u59cb\u5316\u4f1a\u8bdd\u5931\u8d25: " + e.getMessage());
             e.printStackTrace();
         }
-        this.clearLogFiles();
     }
 
     private void clearLogFiles() {
@@ -158,13 +166,168 @@ public class WarehouseService {
         }
     }
 
-    public CompletableFuture<List<WarehouseEntry>> queryWarehouse(List<String> jcbhList, int status, String startDate, String endDate) {
-        return CompletableFuture.supplyAsync(() -> this.executeQuery(jcbhList, status, startDate, endDate), this.queryExecutor);
+    private List<WarehouseEntry> executeSingleSegmentQuery(
+        String rawJcbh,
+        int status,
+        QuerySegment segment,
+        QueryLogSink logs) throws IOException {
+        if (segment == null) {
+            throw new IllegalArgumentException("查询时间段不能为空");
+        }
+        if (logs == null) {
+            throw new IllegalArgumentException("查询日志接收器不能为空");
+        }
+        String jcbh = rawJcbh == null ? "" : rawJcbh.trim();
+        if (jcbh.isEmpty()) {
+            throw new IllegalArgumentException("进仓编号不能为空");
+        }
+        this.checkAndRefreshSession();
+        String statusCode = AppConfig.getStatusCode(status);
+        String methodParameter = this.buildMethodParameter(
+            jcbh,
+            statusCode,
+            segment.start().toString(),
+            segment.end().toString());
+        String queryUrl = this.buildQueryUrl(methodParameter);
+        logs.request(
+            jcbh,
+            segment,
+            "URL: " + queryUrl + "\nMethodParameter: " + methodParameter);
+
+        HttpGet request = new HttpGet(queryUrl);
+        this.setupApiRequestHeaders(request);
+        try (CloseableHttpResponse response = this.httpClient.execute(
+            (HttpUriRequest)request,
+            (HttpContext)this.context)) {
+            int statusCodeValue = response.getStatusLine().getStatusCode();
+            HttpEntity entity = response.getEntity();
+            String responseBody = entity == null
+                ? ""
+                : EntityUtils.toString((HttpEntity)entity, (Charset)StandardCharsets.UTF_8);
+            String rawResponse = "HTTP " + statusCodeValue + "\n" + responseBody;
+            logs.response(jcbh, segment, rawResponse);
+            if (statusCodeValue != 200) {
+                throw new IOException("HTTP请求失败，状态码: " + statusCodeValue);
+            }
+            return this.parseStrictJsonResponse(responseBody, jcbh);
+        }
+        catch (IOException exception) {
+            throw exception;
+        }
+        catch (Exception exception) {
+            throw new IOException("请求执行失败: " + exception.getMessage(), exception);
+        }
+    }
+
+    private List<WarehouseEntry> parseStrictJsonResponse(
+        String responseBody,
+        String jcbh) throws IOException {
+        final JSONObject json;
+        try {
+            json = new JSONObject(responseBody);
+        }
+        catch (Exception exception) {
+            throw new IOException("服务器返回了无效的JSON格式", exception);
+        }
+        int code = json.optInt("code", -1);
+        if (code != 0) {
+            String message = json.optString("msg", "未知错误");
+            throw new IOException("API错误(" + code + "): " + message);
+        }
+        Object data = json.opt("data");
+        if (!(data instanceof JSONArray)) {
+            throw new IOException("API返回格式错误: 缺少数据字段");
+        }
+        JSONArray dataArray = (JSONArray)data;
+        if (dataArray.length() == 0) {
+            return new ArrayList<WarehouseEntry>();
+        }
+        this.logTotalInfo(json);
+        this.extractAndSaveHeaders(dataArray);
+        ArrayList<WarehouseEntry> entries = new ArrayList<WarehouseEntry>();
+        for (int index = 0; index < dataArray.length(); index++) {
+            Object value = dataArray.get(index);
+            if (!(value instanceof JSONObject)) {
+                throw new IOException("API返回数据行格式错误");
+            }
+            entries.add(this.convertJsonToWarehouseEntry(
+                (JSONObject)value,
+                jcbh));
+        }
+        return entries;
+    }
+
+    public CompletableFuture<List<WarehouseEntry>> queryWarehouse(
+        List<String> jcbhList,
+        int status,
+        String startDate,
+        String endDate) {
+        LocalDate parsedStartDate = this.parseDateOrNull(startDate);
+        LocalDate parsedEndDate = this.parseDateOrToday(endDate);
+        QueryBatchRequest request = new QueryBatchRequest(
+            jcbhList,
+            status,
+            QueryMode.NORMAL,
+            parsedStartDate,
+            parsedEndDate);
+        return new QueryBatchService(this, QueryLogSink::persistent)
+            .execute(request, progress -> { })
+            .thenApply(this::compatibilityRows);
+    }
+
+    @Override
+    public CompletableFuture<List<WarehouseEntry>> query(
+        String jcbh,
+        int status,
+        QuerySegment segment,
+        QueryLogSink logs) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return this.executeSingleSegmentQuery(jcbh, status, segment, logs);
+            }
+            catch (Exception exception) {
+                throw new java.util.concurrent.CompletionException(exception);
+            }
+        }, this.queryExecutor);
+    }
+
+    private List<WarehouseEntry> compatibilityRows(QueryBatchResult result) {
+        ArrayList<WarehouseEntry> rows = new ArrayList<WarehouseEntry>(result.rows());
+        for (com.warehousequery.app.query.QueryFailure failure : result.failures()) {
+            WarehouseEntry errorEntry = new WarehouseEntry();
+            errorEntry.setJcbh(failure.entryNumber());
+            errorEntry.setBz("查询失败（第" + failure.segment().ordinal() + "段）: " + failure.message());
+            rows.add(errorEntry);
+        }
+        return rows;
+    }
+
+    private LocalDate parseDateOrToday(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return LocalDate.now();
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        }
+        catch (DateTimeParseException exception) {
+            return LocalDate.now();
+        }
+    }
+
+    private LocalDate parseDateOrNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        }
+        catch (DateTimeParseException exception) {
+            return null;
+        }
     }
 
     private List<WarehouseEntry> executeQuery(List<String> jcbhList, int status, String startDate, String endDate) {
         ArrayList<WarehouseEntry> allEntries = new ArrayList<WarehouseEntry>();
-        this.clearLogFiles();
         this.logQueryParameters(jcbhList, status, startDate, endDate);
         int total = jcbhList.size();
         int current = 0;
