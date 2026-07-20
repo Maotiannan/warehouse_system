@@ -11,6 +11,10 @@
 - 已新增唛头本地编辑和本地缓存覆盖
 - 已修复反编译测试启动器导致源码无法通过 Maven 编译的问题
 
+## 近期设计
+
+- [分段查询与结果恢复设计](docs/superpowers/specs/2026-07-20-segmented-query-and-result-restore-design.md)
+
 ## 唛头本地编辑
 
 - 查询结果每次仍然走网络请求
