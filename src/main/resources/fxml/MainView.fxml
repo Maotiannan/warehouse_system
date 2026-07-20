@@ -80,28 +80,28 @@
                             </columnConstraints>
 
                             <Label text="作业号:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
-                            <TextField fx:id="jobNumberTextField" promptText="作业号/进仓作业号" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+                            <TextField fx:id="jobNumberTextField" promptText="作业号/进仓作业号（逗号表示或）" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
 
                             <Label text="进仓编号:" GridPane.rowIndex="0" GridPane.columnIndex="2"/>
-                            <TextField fx:id="entryNumberTextField" promptText="进仓编号" GridPane.rowIndex="0" GridPane.columnIndex="3"/>
+                            <TextField fx:id="entryNumberTextField" promptText="进仓编号（逗号表示或）" GridPane.rowIndex="0" GridPane.columnIndex="3"/>
 
                             <Label text="货主:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
-                            <TextField fx:id="ownerTextField" promptText="货主" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+                            <TextField fx:id="ownerTextField" promptText="货主（逗号表示或）" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
 
                             <Label text="唛头:" GridPane.rowIndex="1" GridPane.columnIndex="2"/>
-                            <TextField fx:id="markTextField" promptText="唛头 (精确匹配，可多值)" GridPane.rowIndex="1" GridPane.columnIndex="3"/>
+                            <TextField fx:id="markTextField" promptText="唛头（精确匹配，逗号表示或）" GridPane.rowIndex="1" GridPane.columnIndex="3"/>
 
                             <Label text="货物名称:" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
-                            <TextField fx:id="cargoTextField" promptText="货物名称 (模糊)" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+                            <TextField fx:id="cargoTextField" promptText="货物名称（逗号表示或）" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
 
                             <Label text="包装规格:" GridPane.rowIndex="2" GridPane.columnIndex="2"/>
-                            <TextField fx:id="packageTextField" promptText="包装规格 (模糊)" GridPane.rowIndex="2" GridPane.columnIndex="3"/>
+                            <TextField fx:id="packageTextField" promptText="包装规格（逗号表示或）" GridPane.rowIndex="2" GridPane.columnIndex="3"/>
 
                             <Label text="车号:" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
-                            <TextField fx:id="plateTextField" promptText="车号 (模糊，可多值)" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+                            <TextField fx:id="plateTextField" promptText="车号（逗号表示或）" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
 
                             <Label text="司机电话:" GridPane.rowIndex="3" GridPane.columnIndex="2"/>
-                            <TextField fx:id="driverPhoneTextField" promptText="司机电话 (模糊，可多值)" GridPane.rowIndex="3" GridPane.columnIndex="3"/>
+                            <TextField fx:id="driverPhoneTextField" promptText="司机电话（逗号表示或）" GridPane.rowIndex="3" GridPane.columnIndex="3"/>
                         </GridPane>
                     </content>
                     <graphic>

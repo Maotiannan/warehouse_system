@@ -5,6 +5,7 @@ package com.warehousequery.app.controller;
 
 import com.warehousequery.app.config.AppConfig;
 import com.warehousequery.app.model.WarehouseEntry;
+import com.warehousequery.app.query.AdvancedFilterMatcher;
 import com.warehousequery.app.service.LocalEntryCacheService;
 import com.warehousequery.app.service.WarehouseService;
 import com.warehousequery.app.util.ExceptionHandler;
@@ -209,15 +210,15 @@ implements Initializable {
     private int currentStatusIndex = 1;
     private static final int COLUMN_CONFIG_VERSION = 1;
     private static final String LEGACY_SENTINEL = "__MISSING__";
-    private static final String FILTER_OWNER = "owner";
-    private static final String FILTER_ENTRY_NUMBER = "entryNumber";
-    private static final String FILTER_JOB_NUMBER = "jobNumber";
-    private static final String FILTER_DRIVER = "driver";
-    private static final String FILTER_PLATE = "plate";
-    private static final String FILTER_CARGO = "cargo";
-    private static final String FILTER_MARK = "mark";
-    private static final String FILTER_PACKAGE = "package";
-    private static final String FILTER_DRIVER_PHONE = "driverPhone";
+    private static final String FILTER_OWNER = AdvancedFilterMatcher.OWNER;
+    private static final String FILTER_ENTRY_NUMBER = AdvancedFilterMatcher.ENTRY_NUMBER;
+    private static final String FILTER_JOB_NUMBER = AdvancedFilterMatcher.JOB_NUMBER;
+    private static final String FILTER_DRIVER = AdvancedFilterMatcher.DRIVER;
+    private static final String FILTER_PLATE = AdvancedFilterMatcher.PLATE;
+    private static final String FILTER_CARGO = AdvancedFilterMatcher.CARGO;
+    private static final String FILTER_MARK = AdvancedFilterMatcher.MARK;
+    private static final String FILTER_PACKAGE = AdvancedFilterMatcher.PACKAGE;
+    private static final String FILTER_DRIVER_PHONE = AdvancedFilterMatcher.DRIVER_PHONE;
     private boolean suppressColumnConfigPersistence = false;
     private boolean columnOrderListenerAttached = false;
     private final List<WarehouseEntry> masterEntries = new ArrayList<WarehouseEntry>();
@@ -1384,15 +1385,7 @@ implements Initializable {
     }
 
     private boolean matchesAdvancedFilters(WarehouseEntry entry, Map<String, String> filters) {
-        for (Map.Entry<String, String> filter : filters.entrySet()) {
-            boolean matchesField;
-            List<String> terms;
-            String key = filter.getKey();
-            String keyword = filter.getValue();
-            if (keyword == null || keyword.isEmpty() || (terms = this.parseSearchTerms(keyword, this.isExactMatchField(key))).isEmpty() || (matchesField = this.matchEntryField(entry, key, terms))) continue;
-            return false;
-        }
-        return true;
+        return AdvancedFilterMatcher.match(entry, filters);
     }
 
     private List<String> parseSearchTerms(String input, boolean exactMatch) {
