@@ -6,6 +6,16 @@ package com.warehousequery.app.controller;
 import com.warehousequery.app.config.AppConfig;
 import com.warehousequery.app.model.WarehouseEntry;
 import com.warehousequery.app.query.AdvancedFilterMatcher;
+import com.warehousequery.app.query.QueryBatchRequest;
+import com.warehousequery.app.query.QueryBatchResult;
+import com.warehousequery.app.query.QueryBatchService;
+import com.warehousequery.app.query.QueryLogSink;
+import com.warehousequery.app.query.QueryMode;
+import com.warehousequery.app.query.QueryProgress;
+import com.warehousequery.app.query.QuerySnapshot;
+import com.warehousequery.app.query.QuerySnapshotStore;
+import com.warehousequery.app.query.QueryUiState;
+import com.warehousequery.app.query.StartupRestorePlan;
 import com.warehousequery.app.service.LocalEntryCacheService;
 import com.warehousequery.app.service.WarehouseService;
 import com.warehousequery.app.util.ExceptionHandler;
@@ -88,7 +98,6 @@ import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
@@ -97,7 +106,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.util.Duration;
-import javafx.util.converter.DefaultStringConverter;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -109,6 +117,10 @@ implements Initializable {
     private DatePicker startDatePicker;
     @FXML
     private DatePicker endDatePicker;
+    @FXML
+    private CheckBox oneYearCheckBox;
+    @FXML
+    private CheckBox twoYearsCheckBox;
     @FXML
     private ComboBox<String> statusComboBox;
     @FXML
@@ -137,6 +149,8 @@ implements Initializable {
     private ToggleButton advancedToggleButton;
     @FXML
     private Button viewLogsButton;
+    @FXML
+    private Label versionLabel;
     @FXML
     private ProgressBar progressBar;
     @FXML
@@ -178,6 +192,10 @@ implements Initializable {
     @FXML
     private Label queryResultLabel;
     @FXML
+    private HBox statusStrip;
+    @FXML
+    private HBox queryResultStrip;
+    @FXML
     private VBox queryOverlay;
     @FXML
     private Label overlayMessageLabel;
@@ -204,6 +222,10 @@ implements Initializable {
     @FXML
     private TextField driverPhoneTextField;
     private final WarehouseService service = new WarehouseService();
+    private final QueryBatchService batchService = new QueryBatchService(
+        this.service,
+        QueryLogSink::persistent);
+    private final QuerySnapshotStore querySnapshotStore = new QuerySnapshotStore();
     private final LocalEntryCacheService localEntryCacheService = LocalEntryCacheService.getInstance();
     private final ObservableList<WarehouseEntry> entryList = FXCollections.observableArrayList();
     private final Preferences prefs = Preferences.userNodeForPackage(MainController.class);
@@ -224,6 +246,12 @@ implements Initializable {
     private final List<WarehouseEntry> masterEntries = new ArrayList<WarehouseEntry>();
     private int lastRawEntryCount = 0;
     private boolean lastQueryWasError = false;
+    private QueryMode currentQueryMode = QueryMode.NORMAL;
+    private boolean suppressModeChanges = false;
+    private boolean suppressDateValidation = false;
+    private boolean queryActive = false;
+    private boolean shutDown = false;
+    private EditableMarkCell activeMarkCell;
     private static boolean isPOIAvailable = false;
     private ContextMenu cellContextMenu;
 
@@ -232,8 +260,12 @@ implements Initializable {
         System.out.println("\u6b63\u5728\u521d\u59cb\u5316\u4e3b\u63a7\u5236\u5668...");
         try {
             this.initializeMenuItems();
+            if (this.versionLabel != null) {
+                this.versionLabel.setText("v" + AppConfig.APP_VERSION);
+            }
             this.initializeStatusComboBox();
             this.initializeDatePickers();
+            this.initializeQueryModeControls();
             this.initializeTableView();
             this.initializeProgressComponents();
             this.initializeEventHandlers();
@@ -241,7 +273,7 @@ implements Initializable {
             this.initializeLibraryChecks();
             this.initializeAdvancedFilterControls();
             this.installAdvancedFilterListeners();
-            this.restoreLastQueryInputs();
+            this.restoreStartupState();
             System.out.println("\u4e3b\u63a7\u5236\u5668\u521d\u59cb\u5316\u5b8c\u6210");
         }
         catch (Exception e) {
@@ -291,6 +323,7 @@ implements Initializable {
         this.statusComboBox.getSelectionModel().select(1);
         this.currentStatusIndex = 1;
         this.statusComboBox.getSelectionModel().selectedIndexProperty().addListener((obs, oldVal, newVal) -> {
+            this.commitActiveMarkEdit();
             this.currentStatusIndex = newVal.intValue();
         });
     }
@@ -298,12 +331,18 @@ implements Initializable {
     private void initializeDatePickers() {
         this.applyDefaultDateRange();
         this.startDatePicker.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null && this.endDatePicker.getValue() != null) {
+            if (!this.suppressDateValidation
+                && this.currentQueryMode == QueryMode.NORMAL
+                && newVal != null
+                && this.endDatePicker.getValue() != null) {
                 this.validateDateRange((LocalDate)newVal, (LocalDate)this.endDatePicker.getValue());
             }
         });
         this.endDatePicker.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null && this.startDatePicker.getValue() != null) {
+            if (!this.suppressDateValidation
+                && this.currentQueryMode == QueryMode.NORMAL
+                && newVal != null
+                && this.startDatePicker.getValue() != null) {
                 this.validateDateRange((LocalDate)this.startDatePicker.getValue(), (LocalDate)newVal);
             }
         });
@@ -314,8 +353,78 @@ implements Initializable {
     private void applyDefaultDateRange() {
         LocalDate currentDate = LocalDate.now();
         LocalDate startDate = currentDate.minusDays(AppConfig.MAX_DATE_RANGE_DAYS - 1L);
-        this.startDatePicker.setValue(startDate);
-        this.endDatePicker.setValue(currentDate);
+        this.suppressDateValidation = true;
+        try {
+            this.startDatePicker.setValue(startDate);
+            this.endDatePicker.setValue(currentDate);
+            this.startDatePicker.setDisable(false);
+            this.endDatePicker.setDisable(false);
+        }
+        finally {
+            this.suppressDateValidation = false;
+        }
+    }
+
+    private void initializeQueryModeControls() {
+        if (this.oneYearCheckBox == null || this.twoYearsCheckBox == null) {
+            return;
+        }
+        this.oneYearCheckBox.selectedProperty().addListener((obs, oldValue, selected) ->
+            this.handleModeCheckboxChanged(QueryMode.ONE_YEAR, selected.booleanValue()));
+        this.twoYearsCheckBox.selectedProperty().addListener((obs, oldValue, selected) ->
+            this.handleModeCheckboxChanged(QueryMode.TWO_YEARS, selected.booleanValue()));
+        this.applyQueryMode(QueryMode.NORMAL, false);
+    }
+
+    private void handleModeCheckboxChanged(QueryMode mode, boolean selected) {
+        if (this.suppressModeChanges) {
+            return;
+        }
+        this.commitActiveMarkEdit();
+        if (selected) {
+            this.suppressModeChanges = true;
+            try {
+                if (mode == QueryMode.ONE_YEAR) {
+                    this.twoYearsCheckBox.setSelected(false);
+                }
+                else {
+                    this.oneYearCheckBox.setSelected(false);
+                }
+            }
+            finally {
+                this.suppressModeChanges = false;
+            }
+            this.applyQueryMode(mode, true);
+        }
+        else if (!this.oneYearCheckBox.isSelected() && !this.twoYearsCheckBox.isSelected()) {
+            this.applyQueryMode(QueryMode.NORMAL, true);
+        }
+    }
+
+    private void applyQueryMode(QueryMode mode, boolean persist) {
+        QueryUiState state = QueryUiState.forMode(mode, LocalDate.now());
+        this.currentQueryMode = mode;
+        this.suppressDateValidation = true;
+        try {
+            this.startDatePicker.setValue(state.start());
+            this.endDatePicker.setValue(state.end());
+            this.startDatePicker.setDisable(state.datePickersDisabled());
+            this.endDatePicker.setDisable(state.datePickersDisabled());
+            this.suppressModeChanges = true;
+            if (this.oneYearCheckBox != null) {
+                this.oneYearCheckBox.setSelected(state.oneYearSelected());
+            }
+            if (this.twoYearsCheckBox != null) {
+                this.twoYearsCheckBox.setSelected(state.twoYearsSelected());
+            }
+        }
+        finally {
+            this.suppressModeChanges = false;
+            this.suppressDateValidation = false;
+        }
+        if (persist) {
+            this.prefs.put("last_query_mode", mode.name());
+        }
     }
 
     private void initializeAdvancedFilterControls() {
@@ -351,6 +460,8 @@ implements Initializable {
             this.selectedTotalsBox.setManaged(false);
         }
         this.resultTableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        this.resultTableView.getSelectionModel().selectedItemProperty().addListener(
+            (obs, oldValue, newValue) -> this.commitActiveMarkEdit());
         this.resultTableView.setItems(this.entryList);
         this.setupTableColumns();
         this.setupTableContextMenu();
@@ -360,7 +471,18 @@ implements Initializable {
     private void initializeProgressComponents() {
         this.progressBar.setProgress(0.0);
         this.progressBar.setVisible(false);
+        this.progressBar.setManaged(false);
         this.progressLabel.setVisible(false);
+        this.progressLabel.setManaged(false);
+        this.progressBar.visibleProperty().addListener((obs, oldValue, newValue) -> {
+            this.progressBar.setManaged(newValue.booleanValue());
+            this.updateStatusLayout();
+        });
+        this.progressLabel.visibleProperty().addListener((obs, oldValue, newValue) ->
+            this.progressLabel.setManaged(newValue.booleanValue()));
+        this.queryResultLabel.textProperty().addListener((obs, oldValue, newValue) ->
+            this.updateStatusLayout());
+        this.updateStatusLayout();
     }
 
     private void initializeEventHandlers() {
@@ -408,8 +530,11 @@ implements Initializable {
 
     private void validateDateRange(LocalDate start, LocalDate end) {
         long daysBetween;
-        if (start != null && end != null && (daysBetween = ChronoUnit.DAYS.between(start, end)) > 180L) {
-            LocalDate newStartDate = end.minusDays(180L);
+        if (this.suppressDateValidation || this.currentQueryMode != QueryMode.NORMAL) {
+            return;
+        }
+        if (start != null && end != null && (daysBetween = ChronoUnit.DAYS.between(start, end)) > 179L) {
+            LocalDate newStartDate = end.minusDays(179L);
             this.startDatePicker.setValue(newStartDate);
             Platform.runLater(() -> this.showAlert(Alert.AlertType.WARNING, "\u65e5\u671f\u8303\u56f4\u8fc7\u957f", "\u67e5\u8be2\u65e5\u671f\u8303\u56f4\u5df2\u81ea\u52a8\u8c03\u6574\u4e3a180\u5929\uff0c\n\u56e0\u4e3a\u670d\u52a1\u5668\u9650\u5236\u67e5\u8be2\u8303\u56f4\u4e0d\u80fd\u8d85\u8fc7180\u5929\u3002"));
         }
@@ -451,8 +576,11 @@ implements Initializable {
 
     private void checkDateRangeValid(LocalDate start, LocalDate end) {
         long daysBetween;
-        if (start != null && end != null && (daysBetween = ChronoUnit.DAYS.between(start, end)) > 180L) {
-            LocalDate newStartDate = end.minusDays(180L);
+        if (this.suppressDateValidation || this.currentQueryMode != QueryMode.NORMAL) {
+            return;
+        }
+        if (start != null && end != null && (daysBetween = ChronoUnit.DAYS.between(start, end)) > 179L) {
+            LocalDate newStartDate = end.minusDays(179L);
             this.startDatePicker.setValue(newStartDate);
             Platform.runLater(() -> this.showAlert(Alert.AlertType.WARNING, "\u65e5\u671f\u8303\u56f4\u8fc7\u957f", "\u67e5\u8be2\u65e5\u671f\u8303\u56f4\u5df2\u81ea\u52a8\u8c03\u6574\u4e3a180\u5929\uff0c\n\u56e0\u4e3a\u670d\u52a1\u5668\u9650\u5236\u67e5\u8be2\u8303\u56f4\u4e0d\u80fd\u8d85\u8fc7180\u5929\u3002"));
         }
@@ -1196,91 +1324,171 @@ implements Initializable {
 
     @FXML
     private void handleQuery() {
-        String jcbhInput = this.jcbhTextField.getText().trim();
-        LocalDate startDate = (LocalDate)this.startDatePicker.getValue();
-        LocalDate endDate = (LocalDate)this.endDatePicker.getValue();
-        String status = (String)this.statusComboBox.getValue();
+        this.commitActiveMarkEdit();
+        if (this.queryActive) {
+            return;
+        }
+        String jcbhInput = this.jcbhTextField.getText() == null
+            ? ""
+            : this.jcbhTextField.getText().trim();
+        if (jcbhInput.isEmpty()) {
+            this.showAlert(Alert.AlertType.WARNING, "\u8f93\u5165\u9519\u8bef", "\u8bf7\u8f93\u5165\u8fdb\u4ed3\u7f16\u53f7");
+            return;
+        }
+        List<String> jcbhList = Arrays.stream(jcbhInput.split("[,\uff0c\\s;\uff1b]+"))
+            .filter(value -> !value.trim().isEmpty())
+            .map(this::fixJcbhFormat)
+            .collect(Collectors.toList());
+        if (jcbhList.isEmpty()) {
+            this.showAlert(Alert.AlertType.WARNING, "\u8f93\u5165\u9519\u8bef", "\u8bf7\u8f93\u5165\u8fdb\u4ed3\u7f16\u53f7");
+            return;
+        }
+        LocalDate startDate = this.startDatePicker.getValue();
+        LocalDate endDate = this.endDatePicker.getValue();
         if (startDate == null || endDate == null) {
             this.showAlert(Alert.AlertType.ERROR, "\u8f93\u5165\u9519\u8bef", "\u8bf7\u9009\u62e9\u5f00\u59cb\u65e5\u671f\u548c\u7ed3\u675f\u65e5\u671f");
             return;
         }
-        long daysBetween = ChronoUnit.DAYS.between(startDate, endDate);
-        if (daysBetween > 180L) {
-            LocalDate newStartDate = endDate.minusDays(180L);
-            this.startDatePicker.setValue(newStartDate);
-            startDate = newStartDate;
-            this.showAlert(Alert.AlertType.WARNING, "\u65e5\u671f\u8303\u56f4\u8fc7\u957f", "\u67e5\u8be2\u65e5\u671f\u8303\u56f4\u5df2\u81ea\u52a8\u8c03\u6574\u4e3a180\u5929\uff0c\n\u56e0\u4e3a\u670d\u52a1\u5668\u9650\u5236\u67e5\u8be2\u8303\u56f4\u4e0d\u80fd\u8d85\u8fc7180\u5929\u3002");
-        }
-        this.entryList.clear();
-        String jcbhText = jcbhInput;
-        if (jcbhText.isEmpty()) {
-            this.showAlert(Alert.AlertType.WARNING, "\u8f93\u5165\u9519\u8bef", "\u8bf7\u8f93\u5165\u8fdb\u4ed3\u7f16\u53f7");
-            return;
-        }
-        List<String> jcbhList = Arrays.stream(jcbhText.split("[,\\s]+")).filter(s -> !s.trim().isEmpty()).map(this::fixJcbhFormat).collect(Collectors.toList());
-        this.jcbhTextField.setText(String.join((CharSequence)", ", jcbhList));
-        this.currentStatusIndex = this.statusComboBox.getSelectionModel().getSelectedIndex();
-        String startDateStr = startDate.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        String endDateStr = endDate.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        this.saveLastQueryInputs(String.join((CharSequence)", ", jcbhList), startDate, endDate, this.currentStatusIndex);
-        this.setQueryInProgress(true, "\u6b63\u5728\u51c6\u5907\u67e5\u8be2...");
-        this.queryResultLabel.setText("\u6b63\u5728\u67e5\u8be2\uff0c\u8bf7\u7a0d\u5019...");
-        this.service.queryWarehouse(jcbhList, this.currentStatusIndex, startDateStr, endDateStr).thenAcceptAsync(entries -> Platform.runLater(() -> {
+        if (this.currentQueryMode == QueryMode.NORMAL
+            && ChronoUnit.DAYS.between(startDate, endDate) > 179L) {
+            startDate = endDate.minusDays(179L);
+            this.suppressDateValidation = true;
             try {
-                boolean hasNoClassDefError;
-                boolean isErrorEntry;
-                MainController.this.localEntryCacheService.mergeNetworkEntries(entries);
-                int originalCount = entries.size();
-                boolean bl = isErrorEntry = originalCount == 1 && ((WarehouseEntry)entries.get(0)).getBz() != null && (((WarehouseEntry)entries.get(0)).getBz().contains("\u9519\u8bef") || ((WarehouseEntry)entries.get(0)).getBz().contains("API") || ((WarehouseEntry)entries.get(0)).getBz().contains("\u65e5\u671f\u8303\u56f4") || ((WarehouseEntry)entries.get(0)).getBz().contains("\u6ca1\u6709\u627e\u5230"));
-                if (isErrorEntry) {
-                    LocalDate end;
-                    String errorMsg = ((WarehouseEntry)entries.get(0)).getBz();
-                    this.queryResultLabel.setText("\u63d0\u793a: " + errorMsg);
-                    this.queryResultLabel.setStyle("-fx-text-fill: #ff6600;");
-                    if ((errorMsg.contains("\u65e5\u671f\u8303\u56f4") || errorMsg.contains("180\u5929")) && (end = (LocalDate)this.endDatePicker.getValue()) != null) {
-                        LocalDate newStart = end.minusDays(179L);
-                        this.startDatePicker.setValue(newStart);
-                        this.queryResultLabel.setText("\u65e5\u671f\u8303\u56f4\u5df2\u81ea\u52a8\u8c03\u6574\u4e3a180\u5929\uff0c\u8bf7\u91cd\u65b0\u67e5\u8be2");
-                        this.queryResultLabel.setStyle("-fx-text-fill: #0066cc;");
-                    }
-                }
-                if (hasNoClassDefError = entries.stream().map(WarehouseEntry::getBz).filter(Objects::nonNull).anyMatch(bz -> bz.contains("NoClassDefFoundError"))) {
-                    this.showAlert(Alert.AlertType.ERROR, "\u5e93\u7f3a\u5931\u9519\u8bef", "\u7cfb\u7edf\u7f3a\u5c11\u5fc5\u8981\u7684JSON\u5e93\u3002\n\u8bf7\u5b89\u88c5org.json\u5e93\u540e\u518d\u8bd5\u3002\n\u53ef\u4ee5\u5c06json-20230227.jar\u6587\u4ef6\u6dfb\u52a0\u5230lib\u76ee\u5f55\u4e0b\u89e3\u51b3\u6b64\u95ee\u9898\u3002");
-                }
-                this.masterEntries.clear();
-                this.masterEntries.addAll((Collection<WarehouseEntry>)entries);
-                this.lastRawEntryCount = originalCount;
-                this.lastQueryWasError = isErrorEntry;
-                this.applyFiltersToView();
-                if (WarehouseService.hasExtractedTableHeaders()) {
-                    List<String> headers = WarehouseService.getExtractedTableHeaders();
-                    System.out.println("\u4ece\u670d\u52a1\u83b7\u53d6\u5230\u8868\u5934: " + String.join((CharSequence)", ", headers));
-                    this.setupColumnsForStatus(this.currentStatusIndex, headers);
-                }
-            }
-            catch (Exception e) {
-                ExceptionHandler.handleException("\u5904\u7406\u67e5\u8be2\u7ed3\u679c", e);
+                this.startDatePicker.setValue(startDate);
             }
             finally {
-                this.setQueryInProgress(false, "");
+                this.suppressDateValidation = false;
             }
-        })).exceptionally(ex -> {
-            Platform.runLater(() -> {
-                try {
-                    this.queryResultLabel.setText("\u67e5\u8be2\u5931\u8d25: " + ex.getMessage());
-                    this.queryResultLabel.setStyle("-fx-text-fill: #ff6600;");
-                    for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
-                        if (!(cause instanceof NoClassDefFoundError) || !cause.getMessage().contains("org/json/JSONObject")) continue;
-                        this.showAlert(Alert.AlertType.ERROR, "\u5e93\u7f3a\u5931\u9519\u8bef", "\u7cfb\u7edf\u7f3a\u5c11\u5fc5\u8981\u7684JSON\u5e93\u3002\n\u8bf7\u5b89\u88c5org.json\u5e93\u540e\u518d\u8bd5\u3002\n\u53ef\u4ee5\u5c06json-20230227.jar\u6587\u4ef6\u6dfb\u52a0\u5230lib\u76ee\u5f55\u4e0b\u89e3\u51b3\u6b64\u95ee\u9898\u3002");
-                        break;
-                    }
-                }
-                finally {
+            this.showAlert(Alert.AlertType.WARNING, "\u65e5\u671f\u8303\u56f4\u8fc7\u957f", "\u67e5\u8be2\u65e5\u671f\u8303\u56f4\u5df2\u81ea\u52a8\u8c03\u6574\u4e3a180\u5929");
+        }
+        this.jcbhTextField.setText(String.join(", ", jcbhList));
+        this.currentStatusIndex = this.statusComboBox.getSelectionModel().getSelectedIndex();
+        if (this.currentStatusIndex < 0) {
+            this.currentStatusIndex = 1;
+        }
+        QueryBatchRequest request = this.currentQueryMode == QueryMode.NORMAL
+            ? new QueryBatchRequest(
+                jcbhList,
+                this.currentStatusIndex,
+                this.currentQueryMode,
+                startDate,
+                endDate)
+            : new QueryBatchRequest(
+                jcbhList,
+                this.currentStatusIndex,
+                this.currentQueryMode,
+                endDate);
+        this.saveLastQueryInputs(
+            String.join(", ", jcbhList),
+            startDate,
+            endDate,
+            this.currentStatusIndex);
+        this.prefs.put("last_query_mode", this.currentQueryMode.name());
+        this.masterEntries.clear();
+        this.entryList.clear();
+        this.lastRawEntryCount = 0;
+        this.lastQueryWasError = false;
+        this.updateTotals();
+        this.setQueryResultMessage("", "");
+        int totalAttempts = jcbhList.size() * this.currentQueryMode.segmentCount();
+        this.setQueryInProgress(true, "\u6b63\u5728\u67e5\u8be2 0/" + totalAttempts + "...");
+        this.batchService.execute(request, this::handleQueryProgress)
+            .thenAccept(result -> Platform.runLater(() -> this.finishBatchQuery(request, result)))
+            .exceptionally(exception -> {
+                Platform.runLater(() -> {
                     this.setQueryInProgress(false, "");
-                }
+                    this.setQueryResultMessage(
+                        "\u67e5\u8be2\u5931\u8d25: " + this.readableError(exception),
+                        "-fx-text-fill: #ff6600;");
+                });
+                return null;
             });
-            return null;
+    }
+
+    private void handleQueryProgress(QueryProgress progress) {
+        Platform.runLater(() -> {
+            if (!this.queryActive) {
+                return;
+            }
+            if (progress.success() && !progress.rows().isEmpty()) {
+                this.localEntryCacheService.mergeNetworkEntries(progress.rows());
+                this.masterEntries.addAll(progress.rows());
+                this.lastRawEntryCount = this.masterEntries.size();
+                this.applyFiltersToView();
+            }
+            String suffix = progress.success()
+                ? ""
+                : "\uff0c\u5931\u8d25: " + progress.identity();
+            this.setQueryInProgress(
+                true,
+                "\u5df2\u5b8c\u6210 " + progress.completedAttempts() + "/"
+                    + progress.totalAttempts() + suffix);
         });
+    }
+
+    private void finishBatchQuery(
+        QueryBatchRequest request,
+        QueryBatchResult result) {
+        this.queryActive = false;
+        this.commitActiveMarkEdit();
+        this.masterEntries.clear();
+        this.masterEntries.addAll(result.rows());
+        this.lastRawEntryCount = result.rows().size();
+        this.lastQueryWasError = !result.complete();
+        this.applyFiltersToView();
+        if (WarehouseService.hasExtractedTableHeaders()) {
+            this.setupColumnsForStatus(
+                this.currentStatusIndex,
+                WarehouseService.getExtractedTableHeaders());
+        }
+        if (result.complete()) {
+            try {
+                this.querySnapshotStore.replace(new QuerySnapshot(
+                    QuerySnapshot.SCHEMA_VERSION,
+                    java.time.Instant.now(),
+                    request.mode(),
+                    request.entryNumbers(),
+                    request.statusIndex(),
+                    request.endDate(),
+                    result.segments(),
+                    result.rows(),
+                    result.requestLog(),
+                    result.responseLog()));
+                this.setQueryResultMessage(
+                    "\u67e5\u8be2\u5b8c\u6210\uff0c\u627e\u5230 " + result.rows().size() + " \u6761\u8bb0\u5f55",
+                    "");
+            }
+            catch (IOException exception) {
+                this.setQueryResultMessage(
+                    "\u67e5\u8be2\u5b8c\u6210\uff0c\u4f46\u672c\u5730\u5feb\u7167\u4fdd\u5b58\u5931\u8d25: " + exception.getMessage(),
+                    "-fx-text-fill: #ff6600;");
+            }
+        }
+        else {
+            String failed = result.failures().stream()
+                .map(failure -> failure.identity())
+                .collect(Collectors.joining(", "));
+            this.setQueryResultMessage(
+                "\u67e5\u8be2\u5b8c\u6210\uff0c\u6709 " + result.failures().size()
+                    + " \u4e2a\u5206\u6bb5\u5931\u8d25\uff0c\u5df2\u663e\u793a\u6210\u529f\u7ed3\u679c: " + failed,
+                "-fx-text-fill: #ff6600;");
+        }
+        this.setQueryInProgress(false, "");
+    }
+
+    private String readableError(Throwable exception) {
+        Throwable cause = exception;
+        while (cause != null && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        return cause == null || cause.getMessage() == null
+            ? "\u672a\u77e5\u9519\u8bef"
+            : cause.getMessage();
+    }
+
+    @FXML
+    private void handleQueryLegacy() {
+        this.handleQuery();
     }
 
     private void updateTotals() {
@@ -1321,6 +1529,7 @@ implements Initializable {
     }
 
     private void setQueryInProgress(boolean inProgress, String message) {
+        this.queryActive = inProgress;
         if (this.queryOverlay != null) {
             this.queryOverlay.setVisible(inProgress);
             this.queryOverlay.setManaged(inProgress);
@@ -1329,8 +1538,10 @@ implements Initializable {
             this.overlayMessageLabel.setText(message);
         }
         this.progressBar.setVisible(inProgress);
+        this.progressBar.setManaged(inProgress);
         this.progressBar.setProgress(inProgress ? -1.0 : 0.0);
         this.progressLabel.setVisible(inProgress);
+        this.progressLabel.setManaged(inProgress);
         this.progressLabel.setText(inProgress ? message : "");
         this.queryButton.setDisable(inProgress);
         this.exportSelectedButton.setDisable(inProgress);
@@ -1366,6 +1577,33 @@ implements Initializable {
         }
         if (this.exportSelectedMenuItem != null) {
             this.exportSelectedMenuItem.setDisable(inProgress);
+        }
+        this.updateStatusLayout();
+    }
+
+    private void setQueryResultMessage(String message, String style) {
+        if (this.queryResultLabel == null) {
+            return;
+        }
+        String value = message == null ? "" : message;
+        this.queryResultLabel.setText(value);
+        this.queryResultLabel.setStyle(style == null ? "" : style);
+        this.updateStatusLayout();
+    }
+
+    private void updateStatusLayout() {
+        boolean progressVisible = this.progressBar != null
+            && this.progressBar.isVisible();
+        boolean resultVisible = this.queryResultLabel != null
+            && this.queryResultLabel.getText() != null
+            && !this.queryResultLabel.getText().trim().isEmpty();
+        if (this.statusStrip != null) {
+            this.statusStrip.setVisible(progressVisible);
+            this.statusStrip.setManaged(progressVisible);
+        }
+        if (this.queryResultStrip != null) {
+            this.queryResultStrip.setVisible(resultVisible);
+            this.queryResultStrip.setManaged(resultVisible);
         }
     }
 
@@ -1467,6 +1705,7 @@ implements Initializable {
     }
 
     private void applyFiltersToView() {
+        this.commitActiveMarkEdit();
         Map<String, String> filters = this.collectAdvancedFilters();
         this.saveLastAdvancedFilters(filters);
         if (this.masterEntries.isEmpty()) {
@@ -1477,7 +1716,7 @@ implements Initializable {
         List<WarehouseEntry> filtered = this.filterEntries(this.masterEntries, filters);
         this.entryList.setAll((Collection<WarehouseEntry>)filtered);
         this.updateTotals();
-        if (!this.lastQueryWasError) {
+        if (!this.lastQueryWasError && !this.queryActive) {
             this.updateFilterStatusMessage(filtered.size(), this.lastRawEntryCount, !filters.isEmpty());
         }
     }
@@ -1528,30 +1767,77 @@ implements Initializable {
     }
 
     private TableCell<WarehouseEntry, String> createEditableMarkCell() {
-        return new TextFieldTableCell<WarehouseEntry, String>(new DefaultStringConverter()){
-            @Override
-            public void startEdit() {
-                WarehouseEntry entry = MainController.this.getRowEntry(this);
-                if (entry == null || MainController.this.isSpecialEntry(entry) || !MainController.this.localEntryCacheService.hasPersistentKey(entry)) {
-                    return;
-                }
-                super.startEdit();
-            }
+        return new EditableMarkCell();
+    }
 
-            @Override
-            public void cancelEdit() {
-                super.cancelEdit();
-                MainController.this.applyCellPresentation(this, this.getItem(), this.isEmpty());
-            }
+    private final class EditableMarkCell extends TableCell<WarehouseEntry, String> {
+        private TextField editor;
+        private boolean committing;
 
-            @Override
-            public void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (!this.isEditing()) {
-                    MainController.this.applyCellPresentation(this, item, empty);
-                }
+        @Override
+        public void startEdit() {
+            WarehouseEntry entry = MainController.this.getRowEntry(this);
+            if (entry == null
+                || MainController.this.isSpecialEntry(entry)
+                || !MainController.this.localEntryCacheService.hasPersistentKey(entry)) {
+                return;
             }
-        };
+            super.startEdit();
+            this.editor = new TextField(this.getItem() == null ? "" : this.getItem());
+            this.editor.setOnAction(event -> this.commitEditor());
+            this.editor.focusedProperty().addListener((obs, oldValue, focused) -> {
+                if (!focused.booleanValue() && this.isEditing()) {
+                    this.commitEditor();
+                }
+            });
+            this.setText(null);
+            this.setGraphic(this.editor);
+            MainController.this.activeMarkCell = this;
+            this.editor.requestFocus();
+            this.editor.selectAll();
+        }
+
+        @Override
+        public void cancelEdit() {
+            if (this.isEditing()) {
+                this.commitEditor();
+                return;
+            }
+            super.cancelEdit();
+        }
+
+        @Override
+        public void updateItem(String item, boolean empty) {
+            if (this.isEditing() && this.editor != null && empty) {
+                this.commitEditor();
+            }
+            super.updateItem(item, empty);
+            if (!this.isEditing()) {
+                this.editor = null;
+                MainController.this.applyCellPresentation(this, item, empty);
+            }
+        }
+
+        private void commitEditor() {
+            if (!this.isEditing() || this.editor == null || this.committing) {
+                return;
+            }
+            this.committing = true;
+            try {
+                this.commitEdit(this.editor.getText());
+            }
+            finally {
+                this.committing = false;
+            }
+        }
+
+        @Override
+        public void commitEdit(String value) {
+            super.commitEdit(value == null ? "" : value.trim());
+            if (MainController.this.activeMarkCell == this) {
+                MainController.this.activeMarkCell = null;
+            }
+        }
     }
 
     private <T> TableCell<WarehouseEntry, T> createCustomCell() {
@@ -1597,6 +1883,21 @@ implements Initializable {
         return null;
     }
 
+    public void commitActiveMarkEdit() {
+        if (this.activeMarkCell != null) {
+            this.activeMarkCell.commitEditor();
+        }
+    }
+
+    public void shutdown() {
+        if (this.shutDown) {
+            return;
+        }
+        this.shutDown = true;
+        this.commitActiveMarkEdit();
+        this.service.close();
+    }
+
     private boolean isSpecialEntry(WarehouseEntry entry) {
         if (entry == null) {
             return false;
@@ -1637,13 +1938,14 @@ implements Initializable {
 
     @FXML
     private void handleExit() {
+        this.commitActiveMarkEdit();
         Alert confirmExit = new Alert(Alert.AlertType.CONFIRMATION);
         confirmExit.setTitle("\u9000\u51fa\u786e\u8ba4");
         confirmExit.setHeaderText(null);
         confirmExit.setContentText("\u786e\u5b9a\u8981\u9000\u51fa\u5e94\u7528\u7a0b\u5e8f\u5417\uff1f");
         Optional result = confirmExit.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
-            this.service.close();
+            this.shutdown();
             Platform.exit();
         }
     }
@@ -2083,32 +2385,66 @@ implements Initializable {
         this.applyFiltersToView();
     }
 
-    private void restoreLastQueryInputs() {
-        Map<String, String> lastAdvancedFilters;
-        LocalDate storedStart;
-        int savedStatus;
-        if (this.jcbhTextField == null || this.statusComboBox == null) {
-            return;
+    private void restoreStartupState() {
+        QuerySnapshot snapshot = this.querySnapshotStore.load().orElse(null);
+        QueryMode mode = snapshot == null
+            ? this.loadPersistedQueryMode()
+            : snapshot.mode();
+        StartupRestorePlan plan = StartupRestorePlan.from(snapshot, LocalDate.now());
+        if (snapshot == null && mode != QueryMode.NORMAL) {
+            plan = StartupRestorePlan.from(null, LocalDate.now());
         }
-        String lastJcbh = this.prefs.get("last_query_jcbh", "");
-        if (!lastJcbh.isEmpty()) {
-            this.jcbhTextField.setText(lastJcbh);
+        this.applyQueryMode(mode, false);
+        this.currentStatusIndex = snapshot == null
+            ? this.prefs.getInt("last_query_status", 1)
+            : plan.statusIndex();
+        if (this.currentStatusIndex < 0
+            || this.currentStatusIndex >= this.statusComboBox.getItems().size()) {
+            this.currentStatusIndex = 1;
         }
-        if ((savedStatus = this.prefs.getInt("last_query_status", this.currentStatusIndex)) >= 0 && savedStatus < this.statusComboBox.getItems().size()) {
-            this.statusComboBox.getSelectionModel().select(savedStatus);
+        if (this.statusComboBox != null
+            && this.currentStatusIndex >= 0
+            && this.currentStatusIndex < this.statusComboBox.getItems().size()) {
+            this.statusComboBox.getSelectionModel().select(this.currentStatusIndex);
         }
-        if ((storedStart = this.parseStoredDate(this.prefs.get("last_query_start_date", ""))) != null) {
-            this.startDatePicker.setValue(storedStart);
+        if (this.currentStatusIndex != 1) {
+            this.setupTableColumns();
         }
-        LocalDate today = LocalDate.now();
-        this.endDatePicker.setValue(today);
-        if (this.startDatePicker.getValue() == null || ((LocalDate)this.startDatePicker.getValue()).isAfter(today)) {
-            this.startDatePicker.setValue(today.minusDays(AppConfig.MAX_DATE_RANGE_DAYS - 1L));
-        } else {
-            this.validateDateRange((LocalDate)this.startDatePicker.getValue(), today);
+        this.clearAdvancedFilters();
+        this.prefs.remove("last_advanced_filters");
+        this.masterEntries.clear();
+        this.masterEntries.addAll(plan.rows());
+        this.entryList.setAll(plan.rows());
+        this.lastRawEntryCount = plan.rows().size();
+        this.lastQueryWasError = false;
+        if (!plan.entryNumbers().isEmpty()) {
+            this.jcbhTextField.setText(String.join(", ", plan.entryNumbers()));
         }
-        if (!(lastAdvancedFilters = this.loadLastAdvancedFilters()).isEmpty()) {
-            this.applyAdvancedFilters(lastAdvancedFilters);
+        else {
+            this.jcbhTextField.setText(
+                snapshot == null ? this.prefs.get("last_query_jcbh", "") : "");
+        }
+        this.applyFiltersToView();
+        if (snapshot != null) {
+            this.setQueryResultMessage(
+                "\u5df2\u6062\u590d " + snapshot.savedAt()
+                    + " \u7684\u5b8c\u6574\u7ed3\u679c\uff0c\u67e5\u8be2\u8303\u56f4 "
+                    + plan.start() + " \u81f3 " + plan.end()
+                    + "\uff0c\u5171 " + plan.rows().size() + " \u6761",
+                "-fx-text-fill: #2c3e50;");
+        }
+        else {
+            this.setQueryResultMessage("", "");
+        }
+    }
+
+    private QueryMode loadPersistedQueryMode() {
+        String value = this.prefs.get("last_query_mode", QueryMode.NORMAL.name());
+        try {
+            return QueryMode.valueOf(value);
+        }
+        catch (IllegalArgumentException exception) {
+            return QueryMode.NORMAL;
         }
     }
 

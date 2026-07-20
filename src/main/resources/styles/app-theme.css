@@ -29,6 +29,11 @@
     -fx-background-color: #1f5ad4;
 }
 
+.app-toolbar .label {
+    -fx-text-fill: #6b7280;
+    -fx-font-size: 11px;
+}
+
 .filter-pane {
     -fx-padding: 12;
     -fx-background-color: #ffffff;
@@ -64,6 +69,15 @@
 .status-strip {
     -fx-padding: 8 12;
     -fx-background-color: transparent;
+}
+
+.filter-pane .check-box {
+    -fx-padding: 2 4;
+    -fx-text-fill: #2c3e50;
+}
+
+.status-strip:empty {
+    -fx-padding: 0;
 }
 
 .status-strip .label {

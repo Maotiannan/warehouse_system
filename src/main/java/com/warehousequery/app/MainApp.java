@@ -12,9 +12,9 @@
  */
 package com.warehousequery.app;
 
+import com.warehousequery.app.controller.MainController;
 import com.warehousequery.app.util.ExceptionHandler;
 import java.io.IOException;
-import java.net.URL;
 import java.util.prefs.Preferences;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -30,14 +30,17 @@ extends Application {
 
     public void start(Stage primaryStage) {
         try {
-            Parent root = (Parent)FXMLLoader.load((URL)((Object)((Object)this)).getClass().getResource("/fxml/MainView.fxml"));
+            FXMLLoader loader = new FXMLLoader(
+                ((Object)this).getClass().getResource("/fxml/MainView.fxml"));
+            Parent root = (Parent)loader.load();
+            MainController controller = loader.getController();
             Scene scene = new Scene(root, 1000.0, 600.0);
             primaryStage.setTitle("\u4ed3\u5e93\u67e5\u8be2\u7cfb\u7edf");
             primaryStage.setScene(scene);
             primaryStage.setMinWidth(800.0);
             primaryStage.setMinHeight(500.0);
             this.restoreWindowPreferences(primaryStage);
-            this.attachWindowPreferenceListeners(primaryStage);
+            this.attachWindowPreferenceListeners(primaryStage, controller);
             primaryStage.show();
             System.out.println("\u5e94\u7528\u7a0b\u5e8f\u542f\u52a8\u6210\u529f");
         }
@@ -79,8 +82,13 @@ extends Application {
         }
     }
 
-    private void attachWindowPreferenceListeners(Stage stage) {
-        stage.setOnCloseRequest(event -> this.saveWindowPreferences(stage));
+    private void attachWindowPreferenceListeners(
+        Stage stage,
+        MainController controller) {
+        stage.setOnCloseRequest(event -> {
+            controller.shutdown();
+            this.saveWindowPreferences(stage);
+        });
         stage.widthProperty().addListener((obs, oldVal, newVal) -> this.saveWindowPreferences(stage));
         stage.heightProperty().addListener((obs, oldVal, newVal) -> this.saveWindowPreferences(stage));
         stage.xProperty().addListener((obs, oldVal, newVal) -> this.saveWindowPreferences(stage));

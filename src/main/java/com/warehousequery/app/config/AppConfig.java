@@ -11,6 +11,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 public class AppConfig {
+    public static final String APP_VERSION = "1.0-SNAPSHOT";
     public static final String BASE_URL = "http://60.190.0.98:81";
     public static final String API_ENDPOINT = "/csccmisHandler/CsccmisHandler.ashx";
     public static final String WEBSITE_URL = "http://60.190.0.98:81/csccmisHandler/website/csccmis.aspx";

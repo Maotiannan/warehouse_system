@@ -1,6 +1,7 @@
 package com.warehousequery.app.query;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -45,6 +46,11 @@ public final class QueryBatchRequest {
         this.endDate = Objects.requireNonNull(endDate, "endDate");
         if (startDate != null && startDate.isAfter(endDate)) {
             throw new IllegalArgumentException("开始日期不能晚于结束日期");
+        }
+        if (startDate != null
+            && mode == QueryMode.NORMAL
+            && ChronoUnit.DAYS.between(startDate, endDate) > 179L) {
+            throw new IllegalArgumentException("普通查询日期范围不能超过180天");
         }
     }
 

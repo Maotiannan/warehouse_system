@@ -48,6 +48,8 @@
                 <Separator/>
                 <Button fx:id="webVersionButton" text="网页版"/>
                 <Button fx:id="viewLogsButton" text="查看日志"/>
+                <Separator />
+                <Label fx:id="versionLabel" />
             </ToolBar>
 
             <VBox spacing="6">
@@ -63,6 +65,8 @@
                     <DatePicker fx:id="startDatePicker" prefWidth="140"/>
                     <Label text="至"/>
                     <DatePicker fx:id="endDatePicker" prefWidth="140"/>
+                    <CheckBox fx:id="oneYearCheckBox" text="查一年"/>
+                    <CheckBox fx:id="twoYearsCheckBox" text="查两年"/>
 
                 </FlowPane>
 
@@ -113,12 +117,12 @@
                 </TitledPane>
             </VBox>
             
-            <HBox spacing="10" alignment="CENTER_LEFT" styleClass="status-strip">
+            <HBox fx:id="statusStrip" spacing="10" alignment="CENTER_LEFT" styleClass="status-strip" visible="false" managed="false">
                 <ProgressBar fx:id="progressBar" prefWidth="300" visible="false"/>
                 <Label fx:id="progressLabel" visible="false"/>
             </HBox>
             
-            <HBox>
+            <HBox fx:id="queryResultStrip" visible="false" managed="false">
                 <Label fx:id="queryResultLabel" textFill="BLUE"/>
             </HBox>
         </VBox>

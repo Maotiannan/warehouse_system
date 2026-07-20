@@ -72,6 +72,7 @@ public class WarehouseService implements SingleQueryClient {
     private final ExecutorService queryExecutor;
     private static final long SESSION_REFRESH_INTERVAL = 900000L;
     private long lastSessionRefreshTime = 0L;
+    private boolean sessionInitialized = false;
     private static final String REQUEST_LOG_FILE = "request_log.txt";
     private static final String RESPONSE_LOG_FILE = "response_log.txt";
     private static List<String> extractedTableHeaders = new ArrayList<String>();
@@ -87,23 +88,6 @@ public class WarehouseService implements SingleQueryClient {
         };
         int poolSize = Math.max(2, Runtime.getRuntime().availableProcessors());
         this.queryExecutor = Executors.newFixedThreadPool(poolSize, queryThreadFactory);
-        try {
-            this.initSession();
-        }
-        catch (Exception e) {
-            System.err.println("\u521d\u59cb\u5316\u4f1a\u8bdd\u5931\u8d25: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    private void clearLogFiles() {
-        try {
-            Files.deleteIfExists(Paths.get(REQUEST_LOG_FILE, new String[0]));
-            Files.deleteIfExists(Paths.get(RESPONSE_LOG_FILE, new String[0]));
-        }
-        catch (IOException e) {
-            System.err.println("\u6e05\u7a7a\u65e5\u5fd7\u6587\u4ef6\u5931\u8d25: " + e.getMessage());
-        }
     }
 
     private void initSession() {
@@ -118,6 +102,7 @@ public class WarehouseService implements SingleQueryClient {
                 if (statusCode == 200) {
                     this.processSessionResponse(response);
                     this.lastSessionRefreshTime = System.currentTimeMillis();
+                    this.sessionInitialized = true;
                     System.out.println("\u4f1a\u8bdd\u521d\u59cb\u5316\u6210\u529f");
                 } else {
                     System.err.println("\u4f1a\u8bdd\u521d\u59cb\u5316\u5931\u8d25\uff0c\u72b6\u6001\u7801: " + statusCode);
@@ -158,9 +143,10 @@ public class WarehouseService implements SingleQueryClient {
         this.cookieStore.getCookies().forEach(cookie -> System.out.println("  " + cookie.getName() + " = " + cookie.getValue()));
     }
 
-    private void checkAndRefreshSession() {
+    private synchronized void checkAndRefreshSession() {
         long currentTime = System.currentTimeMillis();
-        if (currentTime - this.lastSessionRefreshTime > 900000L) {
+        if (!this.sessionInitialized
+            || currentTime - this.lastSessionRefreshTime > SESSION_REFRESH_INTERVAL) {
             System.out.println("\u4f1a\u8bdd\u8d85\u65f6\uff0c\u6b63\u5728\u5237\u65b0...");
             this.initSession();
         }

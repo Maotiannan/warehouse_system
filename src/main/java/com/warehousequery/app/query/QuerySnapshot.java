@@ -88,4 +88,22 @@ public final class QuerySnapshot {
     public String responseLog() {
         return this.responseLog;
     }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof QuerySnapshot)) {
+            return false;
+        }
+        QuerySnapshot value = (QuerySnapshot)other;
+        return new QuerySnapshotCodec().encode(this)
+            .equals(new QuerySnapshotCodec().encode(value));
+    }
+
+    @Override
+    public int hashCode() {
+        return new QuerySnapshotCodec().encode(this).hashCode();
+    }
 }
