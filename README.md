@@ -40,6 +40,18 @@
   `target/installer/WarehouseQuerySystem-1.0.1.exe`
 - GitHub 仓库不再提交安装包或运行压缩包，最新安装包统一放到 Releases
 
+## 自动化测试
+
+```powershell
+mvn --batch-mode test
+```
+
+日期分段规则可单独验证：
+
+```powershell
+mvn --batch-mode -Dtest=QueryRangePlannerTest test
+```
+
 ## 手动测试重点
 
 1. 启动后确认右侧结束日期自动是今天
