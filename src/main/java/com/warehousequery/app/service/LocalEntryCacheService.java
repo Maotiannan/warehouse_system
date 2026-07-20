@@ -1,6 +1,7 @@
 package com.warehousequery.app.service;
 
 import com.warehousequery.app.model.WarehouseEntry;
+import com.warehousequery.app.query.QuerySnapshotStore;
 import com.warehousequery.app.util.ExceptionHandler;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -17,6 +18,7 @@ public final class LocalEntryCacheService {
     private static final LocalEntryCacheService INSTANCE = new LocalEntryCacheService();
     private static final Path CACHE_FILE = Paths.get(System.getProperty("user.home"), ".warehouse-query-system", "entry-cache.json");
     private static final String ROOT_ENTRIES = "entries";
+    private final QuerySnapshotStore querySnapshotStore = new QuerySnapshotStore();
     private JSONObject cacheRoot;
     private boolean loaded;
 
@@ -95,6 +97,7 @@ public final class LocalEntryCacheService {
             record.put("updatedAt", Instant.now().toString());
             entriesObject.put(cacheKey, record);
             this.writeCache();
+            this.querySnapshotStore.updateMark(cacheKey, entry.getMt());
         }
         catch (Exception e) {
             ExceptionHandler.handleException("保存本地唛头缓存", e, false);

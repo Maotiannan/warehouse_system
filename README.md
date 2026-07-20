@@ -24,6 +24,8 @@
 - 如果本地存在已编辑唛头，后续查询优先显示本地值
 - 本地缓存文件位置：
   `C:\Users\<当前用户>\.warehouse-query-system\entry-cache.json`
+- 最后一次完整查询结果和日志将保存在：
+  `C:\Users\<当前用户>\.warehouse-query-system\query-snapshot.json`
 
 ## 高级筛选
 
