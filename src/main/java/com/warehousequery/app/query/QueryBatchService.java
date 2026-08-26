@@ -3,7 +3,9 @@ package com.warehousequery.app.query;
 import com.warehousequery.app.model.WarehouseEntry;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -59,7 +61,7 @@ public final class QueryBatchService {
             throw new IllegalStateException("Query log sink factory returned null");
         }
         List<QuerySegment> segments = request.segments();
-        List<WarehouseEntry> rows = new ArrayList<WarehouseEntry>();
+        Map<String, WarehouseEntry> rowsByKey = new LinkedHashMap<String, WarehouseEntry>();
         List<QueryFailure> failures = new ArrayList<QueryFailure>();
         int totalAttempts = request.entryNumbers().size() * segments.size();
         int completedAttempts = 0;
@@ -82,7 +84,9 @@ public final class QueryBatchService {
                     returnedRows = value == null
                         ? Collections.<WarehouseEntry>emptyList()
                         : value;
-                    rows.addAll(returnedRows);
+                    for (WarehouseEntry row : returnedRows) {
+                        rowsByKey.put(dedupKey(row), row);
+                    }
                     success = true;
                 }
                 catch (RuntimeException exception) {
@@ -115,7 +119,7 @@ public final class QueryBatchService {
             batchId,
             request,
             segments,
-            rows,
+            new ArrayList<WarehouseEntry>(rowsByKey.values()),
             failures,
             logs.requestLog(),
             logs.responseLog());
@@ -148,5 +152,20 @@ public final class QueryBatchService {
             return exception == null ? "未知错误" : exception.getClass().getSimpleName();
         }
         return message.trim();
+    }
+
+    public static String dedupKey(WarehouseEntry entry) {
+        String inguid = entry.getInguid();
+        if (inguid != null && !inguid.isBlank()) {
+            return "inguid:" + inguid;
+        }
+        String jcid = entry.getJcid();
+        if (jcid != null && !jcid.isBlank()) {
+            return "jcid:" + jcid;
+        }
+        String jcbh = entry.getJcbh();
+        String zyh = entry.getZyh();
+        return "jcbh:" + (jcbh == null ? "" : jcbh)
+            + "|zyh:" + (zyh == null ? "" : zyh);
     }
 }

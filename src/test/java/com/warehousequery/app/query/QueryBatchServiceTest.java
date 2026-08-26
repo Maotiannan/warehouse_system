@@ -79,6 +79,32 @@ class QueryBatchServiceTest {
         assertTrue(result.failures().isEmpty());
     }
 
+    @Test
+    void deduplicatesIdenticalRowsReturnedByMultipleSegments() throws Exception {
+        SingleQueryClient client = (jcbh, status, segment, logs) -> {
+            logs.request(jcbh, segment, "request " + jcbh + "/" + segment.ordinal());
+            WarehouseEntry row = new WarehouseEntry();
+            row.setJcbh(jcbh);
+            row.setZyh("SHARED-JOB-001");
+            row.setJcid("SHARED-CID-001");
+            logs.response(jcbh, segment, "response " + jcbh + "/" + segment.ordinal());
+            return CompletableFuture.completedFuture(List.of(row));
+        };
+
+        QueryBatchResult result = new QueryBatchService(client).execute(
+            new QueryBatchRequest(
+                List.of("A"),
+                2,
+                QueryMode.TWO_YEARS,
+                LocalDate.of(2026, 8, 26)),
+            progress -> { }).get();
+
+        assertTrue(result.complete());
+        assertEquals(1, result.rows().size(),
+            "多个分段返回相同记录时应去重，只保留一条");
+        assertEquals("SHARED-JOB-001", result.rows().get(0).getZyh());
+    }
+
     private QueryBatchRequest requestFor(String id, QueryMode mode) {
         return new QueryBatchRequest(
             List.of(id),

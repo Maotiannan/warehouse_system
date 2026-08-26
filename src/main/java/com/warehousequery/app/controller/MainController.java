@@ -244,6 +244,7 @@ implements Initializable {
     private boolean suppressColumnConfigPersistence = false;
     private boolean columnOrderListenerAttached = false;
     private final List<WarehouseEntry> masterEntries = new ArrayList<WarehouseEntry>();
+    private final java.util.Set<String> masterEntryKeys = new java.util.HashSet<String>();
     private int lastRawEntryCount = 0;
     private boolean lastQueryWasError = false;
     private QueryMode currentQueryMode = QueryMode.NORMAL;
@@ -1118,6 +1119,7 @@ implements Initializable {
         bzCol.setCellFactory(col -> this.createCustomCell());
         this.resultTableView.getColumns().addAll(jcbhCol, jczyhCol, yjrqCol, jcrqCol, lfCol, bzggCol, hwmcCol, mtCol, hhCol, jsCol, tjCol, kctjCol, mzCol, tsCol, shdwCol, kcjsCol, bgztCol, bzCol);
         this.addOperationColumn();
+        this.loadColumnConfiguration();
     }
 
     private void addOperationColumn() {
@@ -1385,6 +1387,7 @@ implements Initializable {
             this.currentStatusIndex);
         this.prefs.put("last_query_mode", this.currentQueryMode.name());
         this.masterEntries.clear();
+        this.masterEntryKeys.clear();
         this.entryList.clear();
         this.lastRawEntryCount = 0;
         this.lastQueryWasError = false;
@@ -1412,7 +1415,12 @@ implements Initializable {
             }
             if (progress.success() && !progress.rows().isEmpty()) {
                 this.localEntryCacheService.mergeNetworkEntries(progress.rows());
-                this.masterEntries.addAll(progress.rows());
+                for (WarehouseEntry row : progress.rows()) {
+                    String key = QueryBatchService.dedupKey(row);
+                    if (this.masterEntryKeys.add(key)) {
+                        this.masterEntries.add(row);
+                    }
+                }
                 this.lastRawEntryCount = this.masterEntries.size();
                 this.applyFiltersToView();
             }
@@ -1432,6 +1440,7 @@ implements Initializable {
         this.queryActive = false;
         this.commitActiveMarkEdit();
         this.masterEntries.clear();
+        this.masterEntryKeys.clear();
         this.masterEntries.addAll(result.rows());
         this.lastRawEntryCount = result.rows().size();
         this.lastQueryWasError = !result.complete();
@@ -2145,7 +2154,14 @@ implements Initializable {
                 width = this.calculateColumnWidth(entry.name);
             }
             entry.width = width;
+            TableColumn.SortType sortType = column.getSortType();
+            entry.sortType = sortType == null ? "" : sortType.name();
             data.entries.add(entry);
+        }
+        for (TableColumn<WarehouseEntry, ?> sortedColumn : this.resultTableView.getSortOrder()) {
+            if (this.isConfigurableColumn(sortedColumn)) {
+                data.sortOrder.add(sortedColumn.getText());
+            }
         }
         return data;
     }
@@ -2191,8 +2207,10 @@ implements Initializable {
                 ColumnConfigEntry entry = entryMap.get(column2.getText());
                 if (entry != null) {
                     column2.setVisible(entry.visible);
-                    if (!(entry.width > 0.0)) continue;
-                    column2.setPrefWidth(entry.width);
+                    if (entry.width > 0.0) {
+                        column2.setPrefWidth(entry.width);
+                        column2.setMinWidth(0.0);
+                    }
                     continue;
                 }
                 column2.setVisible(true);
@@ -2202,6 +2220,39 @@ implements Initializable {
                 return entry != null ? entry.order : Integer.MAX_VALUE;
             }));
             this.rebuildColumnOrder(configurableColumns);
+            Platform.runLater(() -> this.restoreSortOrder(data, entryMap));
+        }
+        finally {
+            this.suppressColumnConfigPersistence = false;
+        }
+    }
+
+    private void restoreSortOrder(ColumnConfigData data, Map<String, ColumnConfigEntry> entryMap) {
+        try {
+            this.suppressColumnConfigPersistence = true;
+            this.resultTableView.getSortOrder().clear();
+            Map<String, TableColumn<WarehouseEntry, ?>> columnByName = new HashMap<String, TableColumn<WarehouseEntry, ?>>();
+            for (TableColumn<WarehouseEntry, ?> column : this.getConfigurableColumns()) {
+                columnByName.put(column.getText(), column);
+            }
+            for (String colName : data.sortOrder) {
+                TableColumn<WarehouseEntry, ?> column = columnByName.get(colName);
+                if (column == null) {
+                    continue;
+                }
+                ColumnConfigEntry entry = entryMap.get(colName);
+                String sortTypeName = entry == null ? "" : entry.sortType;
+                TableColumn.SortType sortType = null;
+                if ("ASCENDING".equals(sortTypeName)) {
+                    sortType = TableColumn.SortType.ASCENDING;
+                } else if ("DESCENDING".equals(sortTypeName)) {
+                    sortType = TableColumn.SortType.DESCENDING;
+                }
+                if (sortType != null) {
+                    column.setSortType(sortType);
+                    this.resultTableView.getSortOrder().add(column);
+                }
+            }
         }
         finally {
             this.suppressColumnConfigPersistence = false;
@@ -2260,7 +2311,16 @@ implements Initializable {
         for (TableColumn<WarehouseEntry, ?> column : this.getConfigurableColumns()) {
             column.visibleProperty().addListener((obs, oldVal, newVal) -> this.persistColumnConfigIfNeeded());
             column.widthProperty().addListener((obs, oldVal, newVal) -> this.persistColumnConfigIfNeeded());
+            column.sortTypeProperty().addListener((obs, oldVal, newVal) -> this.persistColumnConfigIfNeeded());
         }
+        this.resultTableView.getSortOrder().addListener((ListChangeListener<? super TableColumn<WarehouseEntry, ?>>) change -> {
+            while (change.next()) {
+                if (change.wasAdded() || change.wasRemoved() || change.wasPermutated() || change.wasReplaced()) {
+                    this.persistColumnConfigIfNeeded();
+                    break;
+                }
+            }
+        });
     }
 
     private void persistColumnConfigIfNeeded() {
@@ -2413,6 +2473,10 @@ implements Initializable {
         this.clearAdvancedFilters();
         this.prefs.remove("last_advanced_filters");
         this.masterEntries.clear();
+        this.masterEntryKeys.clear();
+        for (WarehouseEntry row : plan.rows()) {
+            this.masterEntryKeys.add(QueryBatchService.dedupKey(row));
+        }
         this.masterEntries.addAll(plan.rows());
         this.entryList.setAll(plan.rows());
         this.lastRawEntryCount = plan.rows().size();
@@ -2686,6 +2750,7 @@ implements Initializable {
     private static class ColumnConfigData {
         int version = 1;
         final List<ColumnConfigEntry> entries = new ArrayList<ColumnConfigEntry>();
+        final List<String> sortOrder = new ArrayList<String>();
 
         private ColumnConfigData() {
         }
@@ -2716,9 +2781,19 @@ implements Initializable {
                 obj.put("width", entry.width);
                 obj.put("visible", entry.visible);
                 obj.put("order", entry.order);
+                if (entry.sortType != null && !entry.sortType.isEmpty()) {
+                    obj.put("sortType", entry.sortType);
+                }
                 columns.put(obj);
             }
             root.put("columns", columns);
+            if (!this.sortOrder.isEmpty()) {
+                JSONArray sortArr = new JSONArray();
+                for (String colName : this.sortOrder) {
+                    sortArr.put(colName);
+                }
+                root.put("sortOrder", sortArr);
+            }
             return root.toString();
         }
 
@@ -2738,7 +2813,14 @@ implements Initializable {
                     entry.width = obj.optDouble("width", 100.0);
                     entry.visible = obj.optBoolean("visible", true);
                     entry.order = obj.optInt("order", i);
+                    entry.sortType = obj.optString("sortType", "");
                     data.entries.add(entry);
+                }
+            }
+            JSONArray sortArr = root.optJSONArray("sortOrder");
+            if (sortArr != null) {
+                for (int i = 0; i < sortArr.length(); ++i) {
+                    data.sortOrder.add(sortArr.getString(i));
                 }
             }
             data.sortByOrder();
@@ -2751,6 +2833,7 @@ implements Initializable {
         double width;
         boolean visible;
         int order;
+        String sortType;
 
         private ColumnConfigEntry() {
         }
