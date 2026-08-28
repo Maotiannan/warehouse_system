@@ -621,11 +621,10 @@ implements Initializable {
         List<String> extractedHeaders = WarehouseService.getExtractedTableHeaders();
         if (!extractedHeaders.isEmpty()) {
             System.out.println("\u4f7f\u7528\u4ece\u7f51\u7ad9\u63d0\u53d6\u7684\u8868\u5934\u540d\u79f0: " + String.join((CharSequence)", ", extractedHeaders));
-            this.setupColumnsForStatus(this.currentStatusIndex, extractedHeaders);
         } else {
-            System.out.println("\u4f7f\u7528\u9884\u5b9a\u4e49\u8868\u5934");
-            this.setupPredefinedColumns();
+            System.out.println("\u672a\u67e5\u8be2\u8fc7\u670d\u52a1\u7aef\uff0c\u4f7f\u7528\u9ed8\u8ba4\u8868\u5934");
         }
+        this.setupColumnsForStatus(this.currentStatusIndex, extractedHeaders);
         this.resultTableView.setEditable(true);
     }
 
@@ -2467,9 +2466,7 @@ implements Initializable {
             && this.currentStatusIndex < this.statusComboBox.getItems().size()) {
             this.statusComboBox.getSelectionModel().select(this.currentStatusIndex);
         }
-        if (this.currentStatusIndex != 1) {
-            this.setupTableColumns();
-        }
+        this.setupTableColumns();
         this.clearAdvancedFilters();
         this.prefs.remove("last_advanced_filters");
         this.masterEntries.clear();
