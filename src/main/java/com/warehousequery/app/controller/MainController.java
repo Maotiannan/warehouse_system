@@ -2095,10 +2095,11 @@ implements Initializable {
                     entry.width = Double.parseDouble(widthRaw);
                 }
                 catch (NumberFormatException ex) {
-                    entry.width = this.calculateColumnWidth(columnName);
+                    entry.width = column.getPrefWidth() > 0.0 ? column.getPrefWidth() : this.calculateColumnWidth(columnName);
                 }
             } else {
-                entry.width = this.calculateColumnWidth(columnName);
+                double legacyPrefWidth = column.getPrefWidth();
+                entry.width = legacyPrefWidth > 0.0 ? legacyPrefWidth : this.calculateColumnWidth(columnName);
             }
             data.entries.add(entry);
         }
@@ -2129,7 +2130,8 @@ implements Initializable {
             } else {
                 entry.order = fallbackOrder++;
                 entry.visible = true;
-                entry.width = this.calculateColumnWidth(columnName);
+                double prefWidth = column.getPrefWidth();
+                entry.width = prefWidth > 0.0 ? prefWidth : this.calculateColumnWidth(columnName);
             }
             data.entries.add(entry);
         }
@@ -2144,7 +2146,7 @@ implements Initializable {
             ColumnConfigEntry entry = new ColumnConfigEntry();
             entry.name = column.getText();
             entry.order = order++;
-            entry.visible = column.isVisible();
+            entry.visible = "操作".equals(entry.name) || column.isVisible();
             double width = column.getWidth();
             if (width <= 0.0) {
                 width = column.getPrefWidth();
@@ -2205,7 +2207,7 @@ implements Initializable {
             for (TableColumn<WarehouseEntry, ?> column2 : configurableColumns) {
                 ColumnConfigEntry entry = entryMap.get(column2.getText());
                 if (entry != null) {
-                    column2.setVisible(entry.visible);
+                    column2.setVisible("操作".equals(column2.getText()) || entry.visible);
                     if (entry.width > 0.0) {
                         column2.setPrefWidth(entry.width);
                         column2.setMinWidth(0.0);
@@ -2260,15 +2262,11 @@ implements Initializable {
 
     private void rebuildColumnOrder(List<TableColumn<WarehouseEntry, ?>> orderedColumns) {
         TableColumn<WarehouseEntry, ?> selectionColumn = this.findSelectionColumn();
-        TableColumn<WarehouseEntry, ?> operationColumn = this.findOperationColumn();
         ArrayList newOrder = new ArrayList();
         if (selectionColumn != null) {
             newOrder.add(selectionColumn);
         }
         newOrder.addAll(orderedColumns);
-        if (operationColumn != null) {
-            newOrder.add(operationColumn);
-        }
         this.resultTableView.getColumns().setAll(newOrder);
     }
 
@@ -2281,20 +2279,12 @@ implements Initializable {
         return null;
     }
 
-    private TableColumn<WarehouseEntry, ?> findOperationColumn() {
-        for (TableColumn tableColumn : this.resultTableView.getColumns()) {
-            if (!"\u64cd\u4f5c".equals(tableColumn.getText())) continue;
-            return tableColumn;
-        }
-        return null;
-    }
-
     private boolean isConfigurableColumn(TableColumn<WarehouseEntry, ?> column) {
         if (column == null) {
             return false;
         }
         String name = column.getText();
-        return name != null && !name.isEmpty() && !"\u64cd\u4f5c".equals(name);
+        return name != null && !name.isEmpty();
     }
 
     private List<TableColumn<WarehouseEntry, ?>> getConfigurableColumns() {
@@ -2676,14 +2666,17 @@ implements Initializable {
             dialog.getDialogPane().getButtonTypes().addAll((ButtonType[])new ButtonType[]{ButtonType.OK, ButtonType.CANCEL});
             Optional result = dialog.showAndWait();
             if (result.isPresent() && result.get() == ButtonType.OK) {
-                for (CheckBox checkBox : columnCheckBoxes) {
-                    TableColumn column = (TableColumn)checkBox.getUserData();
-                    boolean shouldBeVisible = checkBox.isSelected();
-                    column.setVisible(shouldBeVisible);
-                    String columnName = column.getText();
-                    String key = "column_visible_" + this.currentStatusIndex + "_" + columnName;
-                    this.prefs.putBoolean(key, shouldBeVisible);
+                this.suppressColumnConfigPersistence = true;
+                try {
+                    for (CheckBox checkBox : columnCheckBoxes) {
+                        TableColumn column = (TableColumn)checkBox.getUserData();
+                        column.setVisible(checkBox.isSelected());
+                    }
                 }
+                finally {
+                    this.suppressColumnConfigPersistence = false;
+                }
+                this.persistColumnConfigSilently();
                 this.showAlert(Alert.AlertType.INFORMATION, "\u914d\u7f6e\u5df2\u4fdd\u5b58", "\u5217\u663e\u793a\u8bbe\u7f6e\u5df2\u4fdd\u5b58\u5e76\u5e94\u7528");
             }
         }
