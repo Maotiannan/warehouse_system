@@ -1,8 +1,11 @@
-﻿# Maven / Java build output
+# Maven / Java build output
 /target/
 /dependency-reduced-pom.xml
 /dist/
 /temp_jpackage/
+
+# Local installer packages (published via GitHub Releases, not committed)
+/*.exe
 
 # Logs and runtime outputs
 /logs/
