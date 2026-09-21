@@ -1872,6 +1872,7 @@ implements Initializable {
         cell.setOnContextMenuRequested(event -> {
             if (cell.getItem() != null && !cell.getItem().toString().isEmpty()) {
                 this.showCellContextMenu(cell, event.getScreenX(), event.getScreenY(), cell.getItem().toString());
+                event.consume();
             }
         });
     }
@@ -1922,7 +1923,7 @@ implements Initializable {
     private void showCellContextMenu(TableCell<?, ?> cell, double x, double y, String content) {
         if (this.cellContextMenu == null) {
             this.cellContextMenu = new ContextMenu();
-            MenuItem copyMenuItem = new MenuItem("\u590d\u5236\u5185\u5bb9");
+            MenuItem copyMenuItem = new MenuItem("复制内容");
             copyMenuItem.setOnAction(event -> {
                 String textToCopy = (String)this.cellContextMenu.getUserData();
                 if (textToCopy != null && !textToCopy.isEmpty()) {
@@ -1930,9 +1931,14 @@ implements Initializable {
                     ClipboardContent clipContent = new ClipboardContent();
                     clipContent.putString(textToCopy);
                     clipboard.setContent(clipContent);
-                    Tooltip tooltip = new Tooltip("\u5df2\u590d\u5236\u5230\u526a\u8d34\u677f");
+                    Object tipXObj = this.cellContextMenu.getProperties().get("tipX");
+                    Object tipYObj = this.cellContextMenu.getProperties().get("tipY");
+                    double tipX = tipXObj instanceof Double ? (Double)tipXObj : 0.0;
+                    double tipY = tipYObj instanceof Double ? (Double)tipYObj : 0.0;
+                    Tooltip tooltip = new Tooltip("已复制到剪贴板");
                     tooltip.setAutoHide(true);
-                    tooltip.show(cell, x, y + 10.0);
+                    Node ownerNode = this.cellContextMenu.getOwnerNode();
+                    tooltip.show(ownerNode != null ? ownerNode : cell, tipX, tipY + 10.0);
                     PauseTransition delay = new PauseTransition(Duration.seconds(1.0));
                     delay.setOnFinished(e -> tooltip.hide());
                     delay.play();
@@ -1941,6 +1947,8 @@ implements Initializable {
             this.cellContextMenu.getItems().add(copyMenuItem);
         }
         this.cellContextMenu.setUserData(content);
+        this.cellContextMenu.getProperties().put("tipX", Double.valueOf(x));
+        this.cellContextMenu.getProperties().put("tipY", Double.valueOf(y));
         this.cellContextMenu.show(cell, x, y);
     }
 
