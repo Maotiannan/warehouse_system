@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public final class StartupRestorePlan {
     private final List<WarehouseEntry> rows;
@@ -15,6 +16,8 @@ public final class StartupRestorePlan {
     private final boolean shouldQueryNetwork;
     private final List<String> entryNumbers;
     private final int statusIndex;
+    private final LocalDate rangeStart;
+    private final LocalDate rangeEnd;
 
     private StartupRestorePlan(
         List<WarehouseEntry> rows,
@@ -23,7 +26,9 @@ public final class StartupRestorePlan {
         Map<String, String> filters,
         boolean shouldQueryNetwork,
         List<String> entryNumbers,
-        int statusIndex) {
+        int statusIndex,
+        LocalDate rangeStart,
+        LocalDate rangeEnd) {
         this.rows = Collections.unmodifiableList(new ArrayList<WarehouseEntry>(rows));
         this.mode = mode;
         this.uiState = uiState;
@@ -31,6 +36,8 @@ public final class StartupRestorePlan {
         this.shouldQueryNetwork = shouldQueryNetwork;
         this.entryNumbers = Collections.unmodifiableList(new ArrayList<String>(entryNumbers));
         this.statusIndex = statusIndex;
+        this.rangeStart = Objects.requireNonNull(rangeStart, "rangeStart");
+        this.rangeEnd = Objects.requireNonNull(rangeEnd, "rangeEnd");
     }
 
     public static StartupRestorePlan from(QuerySnapshot snapshot, LocalDate today) {
@@ -44,8 +51,14 @@ public final class StartupRestorePlan {
                 Collections.<String, String>emptyMap(),
                 false,
                 Collections.<String>emptyList(),
-                1);
+                1,
+                state.start(),
+                state.end());
         }
+        LocalDate restoredEnd = snapshot.queryEndDate() != null
+            ? snapshot.queryEndDate()
+            : state.end();
+        LocalDate restoredStart = earliestSegmentStart(snapshot, restoredEnd, state.start());
         return new StartupRestorePlan(
             snapshot.rows(),
             mode,
@@ -53,7 +66,32 @@ public final class StartupRestorePlan {
             Collections.<String, String>emptyMap(),
             false,
             snapshot.entryNumbers(),
-            snapshot.statusIndex());
+            snapshot.statusIndex(),
+            restoredStart,
+            restoredEnd);
+    }
+
+    private static LocalDate earliestSegmentStart(
+        QuerySnapshot snapshot,
+        LocalDate fallbackEnd,
+        LocalDate fallbackStart) {
+        List<QuerySegment> segments = snapshot.segments();
+        if (segments != null && !segments.isEmpty()) {
+            LocalDate earliest = null;
+            for (QuerySegment segment : segments) {
+                if (segment == null || segment.start() == null) {
+                    continue;
+                }
+                if (earliest == null || segment.start().isBefore(earliest)) {
+                    earliest = segment.start();
+                }
+            }
+            if (earliest != null) {
+                return earliest;
+            }
+        }
+        LocalDate byMode = QueryUiState.forMode(snapshot.mode(), fallbackEnd).start();
+        return byMode != null ? byMode : fallbackStart;
     }
 
     public List<WarehouseEntry> rows() {
@@ -69,11 +107,11 @@ public final class StartupRestorePlan {
     }
 
     public LocalDate start() {
-        return this.uiState.start();
+        return this.rangeStart;
     }
 
     public LocalDate end() {
-        return this.uiState.end();
+        return this.rangeEnd;
     }
 
     public Map<String, String> filters() {

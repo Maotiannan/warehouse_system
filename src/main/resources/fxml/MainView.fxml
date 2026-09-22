@@ -23,7 +23,6 @@
                 </Menu>
                 <Menu text="查看">
                     <MenuItem fx:id="calcSumMenuItem" text="统计汇总 (Alt+S)" accelerator="Alt+S"/>
-                    <CheckMenuItem fx:id="showHeadersMenuItem" text="显示表头编辑按钮" selected="true"/>
                 </Menu>
                 <Menu text="列配置">
                     <MenuItem fx:id="columnConfigMenuItem" text="列显示设置"/>
@@ -106,6 +105,8 @@
 
                             <Label text="司机电话:" GridPane.rowIndex="3" GridPane.columnIndex="2"/>
                             <TextField fx:id="driverPhoneTextField" promptText="司机电话（逗号表示或）" GridPane.rowIndex="3" GridPane.columnIndex="3"/>
+                            <Label text="司机:" GridPane.rowIndex="4" GridPane.columnIndex="0"/>
+                            <TextField fx:id="driverTextField" promptText="司机姓名（逗号表示或）" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
                         </GridPane>
                     </content>
                     <graphic>

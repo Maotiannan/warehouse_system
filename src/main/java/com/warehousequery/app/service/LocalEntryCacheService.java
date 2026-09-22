@@ -5,9 +5,11 @@ import com.warehousequery.app.query.QuerySnapshotStore;
 import com.warehousequery.app.util.ExceptionHandler;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.List;
@@ -135,7 +137,11 @@ public final class LocalEntryCacheService {
             this.cacheRoot = new JSONObject(content);
         }
         catch (JSONException e) {
-            throw new IOException("无法解析本地缓存文件: " + CACHE_FILE, e);
+            System.err.println("Local mark cache is corrupt and will be rebuilt: " + CACHE_FILE + " (" + e.getMessage() + ")");
+            this.quarantineCorruptCache();
+            this.cacheRoot = new JSONObject();
+            this.cacheRoot.put(ROOT_ENTRIES, new JSONObject());
+            return;
         }
         if (!this.cacheRoot.has(ROOT_ENTRIES) || !(this.cacheRoot.opt(ROOT_ENTRIES) instanceof JSONObject)) {
             this.cacheRoot.put(ROOT_ENTRIES, new JSONObject());
@@ -143,14 +149,45 @@ public final class LocalEntryCacheService {
     }
 
     private void writeCache() throws IOException {
-        Files.createDirectories(CACHE_FILE.getParent());
-        Files.writeString(
-            CACHE_FILE,
-            this.cacheRoot.toString(2),
-            StandardCharsets.UTF_8,
-            StandardOpenOption.CREATE,
-            StandardOpenOption.TRUNCATE_EXISTING
-        );
+        Path parent = CACHE_FILE.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        Path temporary = CACHE_FILE.resolveSibling(
+            CACHE_FILE.getFileName().toString() + ".tmp-" + java.util.UUID.randomUUID());
+        byte[] content = this.cacheRoot.toString(2).getBytes(StandardCharsets.UTF_8);
+        try {
+            Files.write(
+                temporary,
+                content,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE);
+            try {
+                Files.move(
+                    temporary,
+                    CACHE_FILE,
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
+            }
+            catch (AtomicMoveNotSupportedException e) {
+                Files.move(temporary, CACHE_FILE, StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+        finally {
+            Files.deleteIfExists(temporary);
+        }
+    }
+
+    private void quarantineCorruptCache() {
+        try {
+            String backupName = CACHE_FILE.getFileName().toString()
+                + ".corrupt-" + System.currentTimeMillis() + ".json";
+            Path backup = CACHE_FILE.resolveSibling(backupName);
+            Files.move(CACHE_FILE, backup, StandardCopyOption.REPLACE_EXISTING);
+        }
+        catch (IOException moveError) {
+            System.err.println("Failed to quarantine corrupt mark cache: " + moveError.getMessage());
+        }
     }
 
     private String buildCacheKey(WarehouseEntry entry) {

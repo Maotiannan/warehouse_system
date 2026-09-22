@@ -34,10 +34,11 @@ class ControllerStateContractTest {
     void startupRestoreClearsFiltersAndDoesNotRequestNetworkData() {
         StartupRestorePlan plan = StartupRestorePlan.from(
             QuerySnapshotStoreTest.fixtureSnapshot("MARK-01"),
-            LocalDate.of(2026, 7, 20));
+            LocalDate.of(2026, 9, 15));
 
         assertTrue(plan.rows().size() > 0);
         assertEquals(QueryMode.ONE_YEAR, plan.mode());
+        // 恢复的日期范围必须来自快照真实保存的查询时段，而不是按“今天”重新推算
         assertEquals(LocalDate.of(2025, 7, 26), plan.start());
         assertEquals(LocalDate.of(2026, 7, 20), plan.end());
         assertEquals(Map.of(), plan.filters());

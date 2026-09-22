@@ -162,8 +162,6 @@ implements Initializable {
     @FXML
     private MenuItem exportMenuItem;
     @FXML
-    private CheckMenuItem showHeadersMenuItem;
-    @FXML
     private MenuItem calcSumMenuItem;
     @FXML
     private MenuItem exitMenuItem;
@@ -243,6 +241,7 @@ implements Initializable {
     private static final String FILTER_DRIVER_PHONE = AdvancedFilterMatcher.DRIVER_PHONE;
     private boolean suppressColumnConfigPersistence = false;
     private boolean columnOrderListenerAttached = false;
+    private boolean sortOrderListenerAttached = false;
     private final List<WarehouseEntry> masterEntries = new ArrayList<WarehouseEntry>();
     private final java.util.Set<String> masterEntryKeys = new java.util.HashSet<String>();
     private int lastRawEntryCount = 0;
@@ -589,35 +588,6 @@ implements Initializable {
 
     private void setupTableColumns() {
         this.resultTableView.getColumns().clear();
-        TableColumn<WarehouseEntry, Boolean> selectCol = new TableColumn<>("");
-        selectCol.setCellValueFactory(param -> {
-            WarehouseEntry entry = param.getValue();
-            SimpleBooleanProperty booleanProp = new SimpleBooleanProperty(entry.isSelected());
-            booleanProp.addListener((ChangeListener<? super Boolean>)((ChangeListener<Boolean>)(obs, oldVal, newVal) -> {
-                entry.setSelected((boolean)newVal);
-                this.updateSelectedRowsStatistics();
-            }));
-            return booleanProp;
-        });
-        CheckBox selectAllCheckBox = new CheckBox();
-        selectAllCheckBox.setOnAction(event -> {
-            boolean select = selectAllCheckBox.isSelected();
-            for (WarehouseEntry entry : this.entryList) {
-                entry.setSelected(select);
-            }
-            this.resultTableView.refresh();
-            this.updateSelectedRowsStatistics();
-        });
-        selectCol.setGraphic(selectAllCheckBox);
-        selectCol.setCellFactory(param -> {
-            CheckBoxTableCell<WarehouseEntry, Boolean> cell = new CheckBoxTableCell<>();
-            cell.setAlignment(Pos.CENTER);
-            return cell;
-        });
-        selectCol.setEditable(true);
-        selectCol.setPrefWidth(40.0);
-        selectCol.setResizable(false);
-        this.resultTableView.getColumns().add(selectCol);
         List<String> extractedHeaders = WarehouseService.getExtractedTableHeaders();
         if (!extractedHeaders.isEmpty()) {
             System.out.println("\u4f7f\u7528\u4ece\u7f51\u7ad9\u63d0\u53d6\u7684\u8868\u5934\u540d\u79f0: " + String.join((CharSequence)", ", extractedHeaders));
@@ -1968,25 +1938,13 @@ implements Initializable {
 
     private void handleExport() {
         if (this.entryList.isEmpty()) {
-            this.showAlert(Alert.AlertType.WARNING, "\u5bfc\u51fa\u63d0\u793a", "\u5f53\u524d\u6ca1\u6709\u6570\u636e\u53ef\u4ee5\u5bfc\u51fa");
+            this.showAlert(Alert.AlertType.WARNING, "导出提示", "当前没有数据可以导出");
             return;
         }
-        try {
-            String timeStamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-            String fileName = "\u4ed3\u5e93\u67e5\u8be2_" + timeStamp + ".csv";
-            StringBuilder csvContent = new StringBuilder();
-            csvContent.append("\u8fdb\u4ed3\u7f16\u53f7,\u8fdb\u4ed3\u4f5c\u4e1a\u53f7,\u9884\u8fdb\u65e5\u671f,\u8fdb\u4ed3\u65e5\u671f,L/F,\u5305\u88c5\u89c4\u683c,\u8d27\u7269\u540d\u79f0,\u551b\u5934,\u8d27\u53f7,\u4ef6\u6570,\u4f53\u79ef,\u5e93\u5b58\u4f53\u79ef,\u6bdb\u91cd,\u6258\u6570,\u9001\u8d27\u5355\u4f4d,\u5e93\u5b58\u4ef6\u6570,\u62a5\u5173\u72b6\u6001,\u5907\u6ce8\n");
-            for (WarehouseEntry entry : this.entryList) {
-                csvContent.append(String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%.2f,%.2f,%.2f,%d,%s,%.2f,%s,%s\n", entry.getJcbh(), entry.getJczyh(), entry.getYjrq(), entry.getJcrq(), entry.getLf(), entry.getBzgg(), entry.getHwmc(), entry.getMt(), entry.getHh(), entry.getJs(), entry.getTj(), entry.getKctj(), entry.getMz(), entry.getTs(), entry.getShdw(), entry.getKcjs(), entry.getBgzt(), entry.getBz()));
-            }
-            try (PrintWriter writer = new PrintWriter(new OutputStreamWriter((OutputStream)new FileOutputStream(fileName), StandardCharsets.UTF_8));){
-                writer.write(csvContent.toString());
-            }
-            this.showAlert(Alert.AlertType.INFORMATION, "\u5bfc\u51fa\u6210\u529f", "\u6570\u636e\u5df2\u6210\u529f\u5bfc\u51fa\u5230\u6587\u4ef6\uff1a" + fileName);
-        }
-        catch (IOException e) {
-            this.showAlert(Alert.AlertType.ERROR, "\u5bfc\u51fa\u5931\u8d25", "\u5bfc\u51fa\u6570\u636e\u65f6\u53d1\u751f\u9519\u8bef\uff1a" + e.getMessage());
-        }
+        List<WarehouseEntry> rows = new ArrayList<WarehouseEntry>(this.entryList);
+        String defaultFileName = "仓库查询_"
+            + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
+        this.exportRowsToFile(rows, defaultFileName, "导出当前结果");
     }
 
     private void calculateSelectedRowsSum() {
@@ -2310,6 +2268,13 @@ implements Initializable {
             column.widthProperty().addListener((obs, oldVal, newVal) -> this.persistColumnConfigIfNeeded());
             column.sortTypeProperty().addListener((obs, oldVal, newVal) -> this.persistColumnConfigIfNeeded());
         }
+        this.attachSortOrderListenerOnce();
+    }
+
+    private void attachSortOrderListenerOnce() {
+        if (this.sortOrderListenerAttached) {
+            return;
+        }
         this.resultTableView.getSortOrder().addListener((ListChangeListener<? super TableColumn<WarehouseEntry, ?>>) change -> {
             while (change.next()) {
                 if (change.wasAdded() || change.wasRemoved() || change.wasPermutated() || change.wasReplaced()) {
@@ -2318,6 +2283,7 @@ implements Initializable {
                 }
             }
         });
+        this.sortOrderListenerAttached = true;
     }
 
     private void persistColumnConfigIfNeeded() {
@@ -2452,6 +2418,16 @@ implements Initializable {
             plan = StartupRestorePlan.from(null, LocalDate.now());
         }
         this.applyQueryMode(mode, false);
+        if (snapshot != null) {
+            this.suppressDateValidation = true;
+            try {
+                this.startDatePicker.setValue(plan.start());
+                this.endDatePicker.setValue(plan.end());
+            }
+            finally {
+                this.suppressDateValidation = false;
+            }
+        }
         this.currentStatusIndex = snapshot == null
             ? this.prefs.getInt("last_query_status", 1)
             : plan.statusIndex();
@@ -2557,59 +2533,65 @@ implements Initializable {
     }
 
     private void exportSelectedRows() {
-        try {
-            ArrayList<WarehouseEntry> selectedEntries = new ArrayList<WarehouseEntry>();
-            for (WarehouseEntry entry : this.entryList) {
-                if (!entry.isSelected()) continue;
-                selectedEntries.add(entry);
-            }
-            if (selectedEntries.isEmpty()) {
-                this.showAlert(Alert.AlertType.WARNING, "\u5bfc\u51fa\u63d0\u793a", "\u8bf7\u5148\u9009\u62e9\u8981\u5bfc\u51fa\u7684\u6570\u636e\u884c");
-                return;
-            }
-            FileChooser fileChooser = new FileChooser();
-            fileChooser.setTitle("\u5bfc\u51fa\u9009\u4e2d\u884c\u6570\u636e");
-            fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV\u6587\u4ef6 (*.csv)", "*.csv"));
-            fileChooser.setInitialFileName("\u4ed3\u5e93\u5bfc\u51fa\u6570\u636e_" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".csv");
-            File selectedFile = fileChooser.showSaveDialog(this.resultTableView.getScene().getWindow());
-            if (selectedFile == null) {
-                return;
-            }
-            Platform.runLater(() -> {
-                this.progressLabel.setText("\u6b63\u5728\u5bfc\u51fa\u6570\u636e...");
-                this.progressLabel.setVisible(true);
-                this.progressBar.setProgress(-1.0);
-                this.progressBar.setVisible(true);
-            });
-            new Thread(() -> {
-                try {
-                    StringBuilder csvContent = new StringBuilder();
-                    csvContent.append("\ufeff");
-                    csvContent.append("\u8fdb\u4ed3\u7f16\u53f7,\u8fdb\u4ed3\u4f5c\u4e1a\u53f7,\u9884\u8fdb\u65e5\u671f,\u8fdb\u4ed3\u65e5\u671f,L/F,\u5305\u88c5\u89c4\u683c,\u8d27\u7269\u540d\u79f0,\u551b\u5934,\u8d27\u53f7,\u4ef6\u6570,\u4f53\u79ef,\u5e93\u5b58\u4f53\u79ef,\u6bdb\u91cd,\u6258\u6570,\u9001\u8d27\u5355\u4f4d,\u5e93\u5b58\u4ef6\u6570,\u62a5\u5173\u72b6\u6001,\u5907\u6ce8\n");
-                    for (WarehouseEntry entry : selectedEntries) {
-                        csvContent.append(String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%.2f,%.2f,%.2f,%d,%s,%.2f,%s,%s\n", this.csvEscape(entry.getJcbh()), this.csvEscape(entry.getJczyh()), this.csvEscape(entry.getYjrq()), this.csvEscape(entry.getJcrq()), this.csvEscape(entry.getLf()), this.csvEscape(entry.getBzgg()), this.csvEscape(entry.getHwmc()), this.csvEscape(entry.getMt()), this.csvEscape(entry.getHh()), entry.getJs(), entry.getTj(), entry.getKctj(), entry.getMz(), entry.getTs(), this.csvEscape(entry.getShdw()), entry.getKcjs(), this.csvEscape(entry.getBgzt()), this.csvEscape(entry.getBz())));
-                    }
-                    Files.write(selectedFile.toPath(), csvContent.toString().getBytes(StandardCharsets.UTF_8), new OpenOption[0]);
-                    Platform.runLater(() -> {
-                        this.progressBar.setVisible(false);
-                        this.progressLabel.setVisible(false);
-                        this.queryResultLabel.setText("\u5df2\u5bfc\u51fa " + selectedEntries.size() + " \u6761\u8bb0\u5f55\u5230: " + selectedFile.getName());
-                    });
-                }
-                catch (Exception e) {
-                    e.printStackTrace();
-                    Platform.runLater(() -> {
-                        this.progressBar.setVisible(false);
-                        this.progressLabel.setVisible(false);
-                        this.showAlert(Alert.AlertType.ERROR, "\u5bfc\u51fa\u5931\u8d25", "\u5bfc\u51fa\u6570\u636e\u65f6\u53d1\u751f\u9519\u8bef\uff1a" + e.getMessage());
-                    });
-                }
-            }).start();
+        ArrayList<WarehouseEntry> selectedEntries = new ArrayList<WarehouseEntry>();
+        for (WarehouseEntry entry : this.entryList) {
+            if (!entry.isSelected()) continue;
+            selectedEntries.add(entry);
         }
-        catch (Exception e) {
-            e.printStackTrace();
-            this.showAlert(Alert.AlertType.ERROR, "\u5bfc\u51fa\u5931\u8d25", "\u542f\u52a8\u5bfc\u51fa\u8fc7\u7a0b\u5931\u8d25\uff1a" + e.getMessage());
+        if (selectedEntries.isEmpty()) {
+            this.showAlert(Alert.AlertType.WARNING, "导出提示", "请先选择要导出的数据行");
+            return;
         }
+        String defaultFileName = "仓库导出数据_"
+            + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".csv";
+        this.exportRowsToFile(selectedEntries, defaultFileName, "导出选中行数据");
+    }
+
+    private void exportRowsToFile(List<WarehouseEntry> sourceRows, String defaultFileName, String dialogTitle) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle(dialogTitle);
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV文件 (*.csv)", "*.csv"));
+        fileChooser.setInitialFileName(defaultFileName);
+        File selectedFile = fileChooser.showSaveDialog(this.resultTableView.getScene().getWindow());
+        if (selectedFile == null) {
+            return;
+        }
+        List<WarehouseEntry> rows = new ArrayList<WarehouseEntry>(sourceRows);
+        this.progressLabel.setText("正在导出数据...");
+        this.progressLabel.setVisible(true);
+        this.progressBar.setProgress(-1.0);
+        this.progressBar.setVisible(true);
+        Thread worker = new Thread(() -> {
+            try {
+                String csvContent = this.buildExportCsv(rows);
+                Files.write(selectedFile.toPath(), csvContent.getBytes(StandardCharsets.UTF_8), new OpenOption[0]);
+                Platform.runLater(() -> {
+                    this.progressBar.setVisible(false);
+                    this.progressLabel.setVisible(false);
+                    this.queryResultLabel.setText("已导出 " + rows.size() + " 条记录到: " + selectedFile.getName());
+                });
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    this.progressBar.setVisible(false);
+                    this.progressLabel.setVisible(false);
+                    this.showAlert(Alert.AlertType.ERROR, "导出失败", "导出数据时发生错误：" + e.getMessage());
+                });
+            }
+        });
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    private String buildExportCsv(List<WarehouseEntry> rows) {
+        StringBuilder csvContent = new StringBuilder();
+        csvContent.append("\ufeff");
+        csvContent.append("进仓编号,进仓作业号,预进日期,进仓日期,L/F,包装规格,货物名称,唛头,货号,件数,体积,库存体积,毛重,托数,送货单位,库存件数,报关状态,备注\n");
+        for (WarehouseEntry entry : rows) {
+            csvContent.append(String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%.2f,%.2f,%.2f,%d,%s,%.2f,%s,%s\n", this.csvEscape(entry.getJcbh()), this.csvEscape(entry.getJczyh()), this.csvEscape(entry.getYjrq()), this.csvEscape(entry.getJcrq()), this.csvEscape(entry.getLf()), this.csvEscape(entry.getBzgg()), this.csvEscape(entry.getHwmc()), this.csvEscape(entry.getMt()), this.csvEscape(entry.getHh()), entry.getJs(), entry.getTj(), entry.getKctj(), entry.getMz(), entry.getTs(), this.csvEscape(entry.getShdw()), entry.getKcjs(), this.csvEscape(entry.getBgzt()), this.csvEscape(entry.getBz())));
+        }
+        return csvContent.toString();
     }
 
     private String csvEscape(String value) {
