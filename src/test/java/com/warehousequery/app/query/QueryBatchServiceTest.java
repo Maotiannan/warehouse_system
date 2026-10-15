@@ -21,7 +21,7 @@ class QueryBatchServiceTest {
         FakeClient client = new FakeClient();
         List<QueryProgress> progress = new ArrayList<QueryProgress>();
 
-        QueryBatchResult result = new QueryBatchService(client).execute(
+        QueryBatchResult result = new QueryBatchService(client, 0L, 0, 0L).execute(
             new QueryBatchRequest(
                 List.of(" A ", "", "B"),
                 1,
@@ -47,7 +47,7 @@ class QueryBatchServiceTest {
         FakeClient client = new FakeClient(Set.of("A/2"));
         List<QueryProgress> progress = new ArrayList<QueryProgress>();
 
-        QueryBatchResult result = new QueryBatchService(client).execute(
+        QueryBatchResult result = new QueryBatchService(client, 0L, 0, 0L).execute(
             requestFor("A", QueryMode.ONE_YEAR),
             progress::add).get();
 
@@ -65,7 +65,7 @@ class QueryBatchServiceTest {
         FakeClient client = new FakeClient();
         client.emptyIdentities.add("A/1");
 
-        QueryBatchResult result = new QueryBatchService(client).execute(
+        QueryBatchResult result = new QueryBatchService(client, 0L, 0, 0L).execute(
             new QueryBatchRequest(
                 List.of("A", "A"),
                 1,
@@ -91,7 +91,7 @@ class QueryBatchServiceTest {
             return CompletableFuture.completedFuture(List.of(row));
         };
 
-        QueryBatchResult result = new QueryBatchService(client).execute(
+        QueryBatchResult result = new QueryBatchService(client, 0L, 0, 0L).execute(
             new QueryBatchRequest(
                 List.of("A"),
                 2,
@@ -103,6 +103,88 @@ class QueryBatchServiceTest {
         assertEquals(1, result.rows().size(),
             "多个分段返回相同记录时应去重，只保留一条");
         assertEquals("SHARED-JOB-001", result.rows().get(0).getZyh());
+    }
+
+    @Test
+    void retriesAfterRateLimitAndEventuallySucceeds() throws Exception {
+        int[] calls = {0};
+        SingleQueryClient client = (jcbh, status, segment, logs) -> {
+            calls[0]++;
+            logs.request(jcbh, segment, "request " + calls[0]);
+            if (calls[0] <= 2) {
+                CompletableFuture<List<WarehouseEntry>> future = new CompletableFuture<List<WarehouseEntry>>();
+                future.completeExceptionally(new java.io.IOException(
+                    "API错误(429): 429 请求过于频繁，请稍后再试"));
+                return future;
+            }
+            logs.response(jcbh, segment, "HTTP 200");
+            WarehouseEntry row = new WarehouseEntry();
+            row.setJcbh(jcbh);
+            return CompletableFuture.completedFuture(List.of(row));
+        };
+
+        QueryBatchResult result = new QueryBatchService(client, 0L, 3, 1L).execute(
+            requestFor("A", QueryMode.NORMAL),
+            progress -> { }).get();
+
+        assertEquals(3, calls[0], "前两次被限流，应在第三次成功，共调用 3 次");
+        assertTrue(result.complete());
+        assertEquals(1, result.rows().size());
+        assertTrue(result.responseLog().contains("自动重试"),
+            "响应日志应记录自动重试过程");
+    }
+
+    @Test
+    void doesNotRetryNonRetryableErrors() throws Exception {
+        int[] calls = {0};
+        SingleQueryClient client = (jcbh, status, segment, logs) -> {
+            calls[0]++;
+            CompletableFuture<List<WarehouseEntry>> future = new CompletableFuture<List<WarehouseEntry>>();
+            future.completeExceptionally(new IllegalStateException("API错误(1): 进仓编号不存在"));
+            return future;
+        };
+
+        QueryBatchResult result = new QueryBatchService(client, 0L, 3, 1L).execute(
+            requestFor("A", QueryMode.NORMAL),
+            progress -> { }).get();
+
+        assertEquals(1, calls[0], "参数类、确定性错误不应重试");
+        assertFalse(result.complete());
+        assertEquals(1, result.failures().size());
+    }
+
+    @Test
+    void marksFailureAfterRetriesExhausted() throws Exception {
+        int[] calls = {0};
+        SingleQueryClient client = (jcbh, status, segment, logs) -> {
+            calls[0]++;
+            CompletableFuture<List<WarehouseEntry>> future = new CompletableFuture<List<WarehouseEntry>>();
+            future.completeExceptionally(new java.io.IOException(
+                "API错误(429): 429 请求过于频繁，请稍后再试"));
+            return future;
+        };
+
+        QueryBatchResult result = new QueryBatchService(client, 0L, 2, 1L).execute(
+            requestFor("A", QueryMode.NORMAL),
+            progress -> { }).get();
+
+        assertEquals(3, calls[0], "首次请求加两次重试，共 3 次");
+        assertFalse(result.complete());
+        assertEquals(1, result.failures().size());
+    }
+
+    @Test
+    void classifiesRetryableErrors() {
+        assertTrue(QueryBatchService.isRetryable(
+            new java.io.IOException("API错误(429): 429 请求过于频繁，请稍后再试")));
+        assertTrue(QueryBatchService.isRetryable(
+            new java.net.SocketTimeoutException("Read timed out")));
+        assertTrue(QueryBatchService.isRetryable(
+            new java.io.IOException("HTTP请求失败，状态码: 503")));
+        assertFalse(QueryBatchService.isRetryable(
+            new IllegalStateException("API错误(1): 进仓编号不存在")));
+        assertFalse(QueryBatchService.isRetryable(
+            new java.io.IOException("服务器返回了无效的JSON格式")));
     }
 
     private QueryBatchRequest requestFor(String id, QueryMode mode) {
