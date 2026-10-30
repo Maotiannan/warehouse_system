@@ -1365,6 +1365,13 @@ implements Initializable {
                     if (error.isEmpty() || errors.contains(error)) continue;
                     errors.add(error);
                 }
+                Pattern apiErrorPattern = Pattern.compile("API\u9519\u8bef\\(\\d+\\): (.+)");
+                matcher = apiErrorPattern.matcher(responseLog);
+                while (matcher.find()) {
+                    String error = matcher.group(1).trim();
+                    if (error.isEmpty() || errors.contains(error)) continue;
+                    errors.add(error);
+                }
                 Pattern warningPattern = Pattern.compile("\u8b66\u544a: (.+)");
                 matcher = warningPattern.matcher(responseLog);
                 while (matcher.find()) {
