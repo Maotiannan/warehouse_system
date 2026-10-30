@@ -55,6 +55,24 @@ public final class QueryBatchService {
             DEFAULT_BASE_BACKOFF_MILLIS);
     }
 
+    /**
+     * 带日志工厂与节流/重试参数：调用方（如主程序按查询系统切换间隔）可以
+     * 显式指定最小间隔、重试次数与退避基准时间。
+     */
+    public QueryBatchService(
+        SingleQueryClient client,
+        Function<String, QueryLogSink> logSinkFactory,
+        long minIntervalMillis,
+        int maxRetries,
+        long baseBackoffMillis) {
+        this(client,
+            ForkJoinPool.commonPool(),
+            logSinkFactory,
+            minIntervalMillis,
+            maxRetries,
+            baseBackoffMillis);
+    }
+
     public QueryBatchService(
         SingleQueryClient client,
         Executor executor,

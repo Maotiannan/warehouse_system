@@ -45,6 +45,10 @@
                 <Separator/>
                 <ToggleButton fx:id="advancedToggleButton" text="高级筛选"/>
                 <Separator/>
+                <CheckBox fx:id="newSystemCheckBox" text="新查询系统">
+                    <tooltip><Tooltip text="勾选后查询新系统（螭吻WMS）；不勾选保持老系统"/></tooltip>
+                </CheckBox>
+                <Separator />
                 <Button fx:id="webVersionButton" text="网页版"/>
                 <Button fx:id="viewLogsButton" text="查看日志"/>
                 <Separator />

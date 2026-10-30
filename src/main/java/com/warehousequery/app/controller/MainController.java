@@ -15,8 +15,10 @@ import com.warehousequery.app.query.QueryProgress;
 import com.warehousequery.app.query.QuerySnapshot;
 import com.warehousequery.app.query.QuerySnapshotStore;
 import com.warehousequery.app.query.QueryUiState;
+import com.warehousequery.app.query.SingleQueryClient;
 import com.warehousequery.app.query.StartupRestorePlan;
 import com.warehousequery.app.service.LocalEntryCacheService;
+import com.warehousequery.app.service.NewWarehouseService;
 import com.warehousequery.app.service.WarehouseService;
 import com.warehousequery.app.util.ExceptionHandler;
 import java.awt.Desktop;
@@ -219,10 +221,13 @@ implements Initializable {
     private TextField packageTextField;
     @FXML
     private TextField driverPhoneTextField;
-    private final WarehouseService service = new WarehouseService();
-    private final QueryBatchService batchService = new QueryBatchService(
-        this.service,
-        QueryLogSink::persistent);
+    private final WarehouseService legacyService = new WarehouseService();
+    private final NewWarehouseService newSystemService = new NewWarehouseService();
+    private SingleQueryClient activeService;
+    private QueryBatchService batchService;
+    private boolean useNewSystem = false;
+    @FXML
+    private CheckBox newSystemCheckBox;
     private final QuerySnapshotStore querySnapshotStore = new QuerySnapshotStore();
     private final LocalEntryCacheService localEntryCacheService = LocalEntryCacheService.getInstance();
     private final ObservableList<WarehouseEntry> entryList = FXCollections.observableArrayList();
@@ -270,6 +275,7 @@ implements Initializable {
             this.initializeProgressComponents();
             this.initializeEventHandlers();
             this.initializeToolbarControls();
+            this.initializeQuerySystemSelection();
             this.initializeLibraryChecks();
             this.initializeAdvancedFilterControls();
             this.installAdvancedFilterListeners();
@@ -526,6 +532,47 @@ implements Initializable {
             System.err.println("\u8b66\u544a: JSON\u5e93\u672a\u627e\u5230 - " + e.getMessage());
             this.showAlert(Alert.AlertType.WARNING, "\u5e93\u7f3a\u5931\u8b66\u544a", "\u672a\u627e\u5230JSON\u89e3\u6790\u5e93\uff0c\u8bf7\u5b89\u88c5org.json\u5e93\u3002\n\u7cfb\u7edf\u5c06\u5c1d\u8bd5\u56de\u9000\u5230\u65e7\u7248HTML\u89e3\u6790\u65b9\u5f0f\uff0c\u4f46\u53ef\u80fd\u65e0\u6cd5\u6b63\u5e38\u5de5\u4f5c\u3002");
         }
+    }
+
+    /**
+     * 查询系统选择：勾选"新查询系统"走新系统（螭吻WMS），否则走老系统。
+     * 偏好会持久化，下次启动自动恢复；切换时重建批量查询服务，
+     * 新系统使用更宽松的请求间隔，老系统维持原有节流参数。
+     */
+    private void initializeQuerySystemSelection() {
+        boolean useNew = this.prefs.getBoolean(AppConfig.PREF_USE_NEW_SYSTEM, false);
+        this.useNewSystem = useNew;
+        if (this.newSystemCheckBox != null) {
+            this.newSystemCheckBox.setSelected(useNew);
+            this.newSystemCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                this.applyQuerySystemSelection(newVal != null && newVal.booleanValue());
+            });
+        }
+        this.rebuildQueryServices();
+        System.out.println("\u5f53\u524d\u67e5\u8be2\u7cfb\u7edf: " + (this.useNewSystem ? "\u65b0\u7cfb\u7edf(\u87ca\u543bWMS)" : "\u8001\u7cfb\u7edf"));
+    }
+
+    private void applyQuerySystemSelection(boolean useNew) {
+        if (this.useNewSystem == useNew) {
+            return;
+        }
+        this.useNewSystem = useNew;
+        this.prefs.putBoolean(AppConfig.PREF_USE_NEW_SYSTEM, useNew);
+        this.rebuildQueryServices();
+        System.out.println("\u5df2\u5207\u6362\u67e5\u8be2\u7cfb\u7edf: " + (useNew ? "\u65b0\u7cfb\u7edf(\u87ca\u543bWMS)" : "\u8001\u7cfb\u7edf"));
+    }
+
+    private void rebuildQueryServices() {
+        this.activeService = this.useNewSystem ? this.newSystemService : this.legacyService;
+        long interval = this.useNewSystem
+            ? AppConfig.NEW_SYSTEM_MIN_INTERVAL_MILLIS
+            : AppConfig.LEGACY_SYSTEM_MIN_INTERVAL_MILLIS;
+        this.batchService = new QueryBatchService(
+            this.activeService,
+            QueryLogSink::persistent,
+            interval,
+            AppConfig.DEFAULT_MAX_RETRIES,
+            AppConfig.DEFAULT_BASE_BACKOFF_MILLIS);
     }
 
     private void validateDateRange(LocalDate start, LocalDate end) {
@@ -1158,6 +1205,10 @@ implements Initializable {
     }
 
     private void openTxxPage(WarehouseEntry entry) {
+        if (this.useNewSystem) {
+            this.openNewSystemFile(entry, "\u6258\u4fe1\u606f");
+            return;
+        }
         String openId = this.getEntryOpenId(entry);
         String jcbh = entry.getJcbh();
         String zyh = this.getEntryZyh(entry);
@@ -1176,9 +1227,50 @@ implements Initializable {
     }
 
     private void openZpPage(WarehouseEntry entry) {
+        if (this.useNewSystem) {
+            this.openNewSystemFile(entry, "\u7167\u7247");
+            return;
+        }
         String url = AppConfig.getPhotoUrl(this.getEntryOpenId(entry), entry.getJcbh(), this.getEntryZyh(entry), entry.getBzgg());
         this.openWebPage(url);
         System.out.println("\u6253\u5f00\u7167\u7247\u9875\u9762: " + url + " (\u8fdb\u4ed3\u7f16\u53f7: " + entry.getJcbh() + ")");
+    }
+
+    /**
+     * 新系统模式下打开单据附件：请求新系统的附件接口，拿到文件地址后
+     * 用系统浏览器打开；接口返回空或出错时给出提示（不弹错窗阻断查询）。
+     */
+    private void openNewSystemFile(WarehouseEntry entry, String label) {
+        String resourceId = this.getEntryOpenId(entry);
+        if (resourceId.isEmpty()) {
+            this.showAlert(Alert.AlertType.INFORMATION, "\u67e5\u770b" + label, "\u8be5\u8bb0\u5f55\u6ca1\u6709\u9644\u4ef6\u6807\u8bc6\uff0c\u65e0\u6cd5\u6253\u5f00\u9644\u4ef6\u3002");
+            return;
+        }
+        this.setQueryResultMessage("\u6b63\u5728\u83b7\u53d6" + label + "...", "-fx-text-fill: #2c3e50;");
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                return this.newSystemService.fetchFileUrl(resourceId, AppConfig.NEW_SYSTEM_BIZ_TYPE_RESERVATION);
+            }
+            catch (Exception exception) {
+                throw new java.util.concurrent.CompletionException(exception);
+            }
+        }).thenAccept(fileUrl -> Platform.runLater(() -> {
+            this.setQueryResultMessage("", "");
+            this.openWebPage(fileUrl);
+        })).exceptionally(exception -> {
+            Platform.runLater(() -> {
+                this.setQueryResultMessage("", "");
+                Throwable cause = exception instanceof java.util.concurrent.CompletionException
+                    ? exception.getCause()
+                    : exception;
+                this.showAlert(Alert.AlertType.INFORMATION,
+                    "\u67e5\u770b" + label,
+                    cause == null || cause.getMessage() == null
+                        ? "\u83b7\u53d6\u9644\u4ef6\u5931\u8d25"
+                        : cause.getMessage());
+            });
+            return null;
+        });
     }
 
     private String getEntryOpenId(WarehouseEntry entry) {
@@ -1874,7 +1966,8 @@ implements Initializable {
         }
         this.shutDown = true;
         this.commitActiveMarkEdit();
-        this.service.close();
+        this.legacyService.close();
+        this.newSystemService.close();
     }
 
     private boolean isSpecialEntry(WarehouseEntry entry) {

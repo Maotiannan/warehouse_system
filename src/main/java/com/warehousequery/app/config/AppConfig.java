@@ -15,6 +15,16 @@ public class AppConfig {
     public static final String BASE_URL = "http://60.190.0.98:81";
     public static final String API_ENDPOINT = "/csccmisHandler/CsccmisHandler.ashx";
     public static final String WEBSITE_URL = "http://60.190.0.98:81/csccmisHandler/website/csccmis.aspx";
+    public static final String NEW_SYSTEM_BASE_URL = "https://cw-query.gx-logistics.com";
+    public static final String NEW_SYSTEM_QUERY_ENDPOINT = "/api/query_platform/anonymous/wms_in_order_reservation/query";
+    public static final String NEW_SYSTEM_SYS_FILE_ENDPOINT = "/api/query_platform/anonymous/sys_file/biz_info/";
+    public static final String NEW_SYSTEM_BIZ_TYPE_RESERVATION = "WmsInOrder_Reservation";
+    public static final String PREF_USE_NEW_SYSTEM = "use_new_system";
+    public static final long LEGACY_SYSTEM_MIN_INTERVAL_MILLIS = 300L;
+    public static final long NEW_SYSTEM_MIN_INTERVAL_MILLIS = 120L;
+    public static final int DEFAULT_MAX_RETRIES = 4;
+    public static final long DEFAULT_BASE_BACKOFF_MILLIS = 1000L;
+    private static final String[] NEW_SYSTEM_COVER_STATUS = {"0", "150", "200", "300"};
     public static final long SESSION_REFRESH_INTERVAL = 900000L;
     public static final int MAX_RETRY_ATTEMPTS = 3;
     public static final int RETRY_DELAY_MS = 1000;
@@ -75,6 +85,18 @@ public class AppConfig {
             return STATUS_CODES[index];
         }
         return STATUS_CODES[1];
+    }
+
+    /**
+     * 把程序的旧状态索引（0预约/1进仓/2库存/3出仓）映射为新系统的
+     * 覆盖状态码（0预约/150进仓/200库存/300出仓）。新系统多出来的
+     * 100预进仓不在旧四档内，不参与映射。
+     */
+    public static String newSystemCoverStatus(int statusIndex) {
+        if (statusIndex >= 0 && statusIndex < NEW_SYSTEM_COVER_STATUS.length) {
+            return NEW_SYSTEM_COVER_STATUS[statusIndex];
+        }
+        return null;
     }
 
     public static String getApiUrl() {
