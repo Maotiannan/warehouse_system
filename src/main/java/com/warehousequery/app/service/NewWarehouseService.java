@@ -237,6 +237,7 @@ public class NewWarehouseService implements SingleQueryClient {
         entry.setBgzt(statusName(item));
         entry.setJcid(text(item, "id", ""));
         entry.setInguid(text(item, "resourceId", ""));
+        entry.setSourceSystem(1);
         entry.setBz(text(item, "tallyRemark", ""));
         entry.setSrrq(text(item, "addTime", ""));
         entry.setXhrq(text(item, "checkInTime", ""));

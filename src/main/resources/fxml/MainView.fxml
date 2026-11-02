@@ -46,7 +46,7 @@
                 <ToggleButton fx:id="advancedToggleButton" text="高级筛选"/>
                 <Separator/>
                 <CheckBox fx:id="newSystemCheckBox" text="新查询系统">
-                    <tooltip><Tooltip text="勾选后查询新系统（螭吻WMS）；不勾选保持老系统"/></tooltip>
+                    <tooltip><Tooltip text="勾选后同时查询新系统（螭吻WMS）和老系统，结果合并显示；不勾选只查老系统"/></tooltip>
                 </CheckBox>
                 <Separator />
                 <Button fx:id="webVersionButton" text="网页版"/>

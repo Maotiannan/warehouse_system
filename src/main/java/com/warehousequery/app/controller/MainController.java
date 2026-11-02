@@ -9,9 +9,11 @@ import com.warehousequery.app.query.AdvancedFilterMatcher;
 import com.warehousequery.app.query.QueryBatchRequest;
 import com.warehousequery.app.query.QueryBatchResult;
 import com.warehousequery.app.query.QueryBatchService;
+import com.warehousequery.app.query.QueryFailure;
 import com.warehousequery.app.query.QueryLogSink;
 import com.warehousequery.app.query.QueryMode;
 import com.warehousequery.app.query.QueryProgress;
+import com.warehousequery.app.query.QuerySegment;
 import com.warehousequery.app.query.QuerySnapshot;
 import com.warehousequery.app.query.QuerySnapshotStore;
 import com.warehousequery.app.query.QueryUiState;
@@ -223,9 +225,9 @@ implements Initializable {
     private TextField driverPhoneTextField;
     private final WarehouseService legacyService = new WarehouseService();
     private final NewWarehouseService newSystemService = new NewWarehouseService();
-    private SingleQueryClient activeService;
-    private QueryBatchService batchService;
-    private boolean useNewSystem = false;
+    private QueryBatchService legacyBatchService;
+    private QueryBatchService newSystemBatchService;
+    private boolean useNewSystem = true;
     @FXML
     private CheckBox newSystemCheckBox;
     private final QuerySnapshotStore querySnapshotStore = new QuerySnapshotStore();
@@ -540,7 +542,7 @@ implements Initializable {
      * 新系统使用更宽松的请求间隔，老系统维持原有节流参数。
      */
     private void initializeQuerySystemSelection() {
-        boolean useNew = this.prefs.getBoolean(AppConfig.PREF_USE_NEW_SYSTEM, false);
+        boolean useNew = this.prefs.getBoolean(AppConfig.PREF_USE_NEW_SYSTEM, true);
         this.useNewSystem = useNew;
         if (this.newSystemCheckBox != null) {
             this.newSystemCheckBox.setSelected(useNew);
@@ -549,7 +551,9 @@ implements Initializable {
             });
         }
         this.rebuildQueryServices();
-        System.out.println("\u5f53\u524d\u67e5\u8be2\u7cfb\u7edf: " + (this.useNewSystem ? "\u65b0\u7cfb\u7edf(\u87ca\u543bWMS)" : "\u8001\u7cfb\u7edf"));
+        System.out.println("\u5f53\u524d\u67e5\u8be2\u7cfb\u7edf: " + (this.useNewSystem
+            ? "\u65b0\u7cfb\u7edf+\u8001\u7cfb\u7edf\uff08\u8054\u5408\u67e5\u8be2\uff09"
+            : "\u8001\u7cfb\u7edf\uff08\u4ec5\uff09"));
     }
 
     private void applyQuerySystemSelection(boolean useNew) {
@@ -559,18 +563,22 @@ implements Initializable {
         this.useNewSystem = useNew;
         this.prefs.putBoolean(AppConfig.PREF_USE_NEW_SYSTEM, useNew);
         this.rebuildQueryServices();
-        System.out.println("\u5df2\u5207\u6362\u67e5\u8be2\u7cfb\u7edf: " + (useNew ? "\u65b0\u7cfb\u7edf(\u87ca\u543bWMS)" : "\u8001\u7cfb\u7edf"));
+        System.out.println("\u5df2\u5207\u6362\u67e5\u8be2\u7cfb\u7edf: " + (useNew
+            ? "\u65b0\u7cfb\u7edf+\u8001\u7cfb\u7edf\uff08\u8054\u5408\u67e5\u8be2\uff09"
+            : "\u8001\u7cfb\u7edf\uff08\u4ec5\uff09"));
     }
 
     private void rebuildQueryServices() {
-        this.activeService = this.useNewSystem ? this.newSystemService : this.legacyService;
-        long interval = this.useNewSystem
-            ? AppConfig.NEW_SYSTEM_MIN_INTERVAL_MILLIS
-            : AppConfig.LEGACY_SYSTEM_MIN_INTERVAL_MILLIS;
-        this.batchService = new QueryBatchService(
-            this.activeService,
+        this.legacyBatchService = new QueryBatchService(
+            this.legacyService,
             QueryLogSink::persistent,
-            interval,
+            AppConfig.LEGACY_SYSTEM_MIN_INTERVAL_MILLIS,
+            AppConfig.DEFAULT_MAX_RETRIES,
+            AppConfig.DEFAULT_BASE_BACKOFF_MILLIS);
+        this.newSystemBatchService = new QueryBatchService(
+            this.newSystemService,
+            QueryLogSink::persistent,
+            AppConfig.NEW_SYSTEM_MIN_INTERVAL_MILLIS,
             AppConfig.DEFAULT_MAX_RETRIES,
             AppConfig.DEFAULT_BASE_BACKOFF_MILLIS);
     }
@@ -672,8 +680,28 @@ implements Initializable {
             }
         }
         this.resultTableView.getColumns().addAll(columnsToAdd);
+        this.addSourceSystemColumn();
         this.addOperationColumn();
         this.loadColumnConfiguration();
+    }
+
+    private void addSourceSystemColumn() {
+        TableColumn<WarehouseEntry, String> column = new TableColumn<>("\u6765\u6e90\u7cfb\u7edf");
+        column.setCellValueFactory(param -> {
+            WarehouseEntry entry = param.getValue();
+            return new javafx.beans.property.SimpleStringProperty(
+                entry.getSourceSystem() == 1 ? "\u65b0" : "\u8001");
+        });
+        column.setComparator((left, right) -> {
+            int leftSource = left == null || left.isEmpty() ? 0
+                : ("\u65b0".equals(left) ? 1 : 0);
+            int rightSource = right == null || right.isEmpty() ? 0
+                : ("\u65b0".equals(right) ? 1 : 0);
+            return Integer.compare(leftSource, rightSource);
+        });
+        column.setPrefWidth(this.getColumnWidthFromConfig(
+            this.currentStatusIndex, "\u6765\u6e90\u7cfb\u7edf", 80.0));
+        this.resultTableView.getColumns().add(column);
     }
 
     private void addSelectionColumn() {
@@ -1205,7 +1233,7 @@ implements Initializable {
     }
 
     private void openTxxPage(WarehouseEntry entry) {
-        if (this.useNewSystem) {
+        if (entry != null && entry.getSourceSystem() == 1) {
             this.openNewSystemFile(entry, "\u6258\u4fe1\u606f");
             return;
         }
@@ -1227,7 +1255,7 @@ implements Initializable {
     }
 
     private void openZpPage(WarehouseEntry entry) {
-        if (this.useNewSystem) {
+        if (entry != null && entry.getSourceSystem() == 1) {
             this.openNewSystemFile(entry, "\u7167\u7247");
             return;
         }
@@ -1461,19 +1489,50 @@ implements Initializable {
         this.lastQueryWasError = false;
         this.updateTotals();
         this.setQueryResultMessage("", "");
-        int totalAttempts = jcbhList.size() * this.currentQueryMode.segmentCount();
+        int perChannelAttempts = jcbhList.size() * this.currentQueryMode.segmentCount();
+        int totalAttempts = perChannelAttempts * (this.useNewSystem ? 2 : 1);
         this.setQueryInProgress(true, "\u6b63\u5728\u67e5\u8be2 0/" + totalAttempts + "...");
-        this.batchService.execute(request, this::handleQueryProgress)
-            .thenAccept(result -> Platform.runLater(() -> this.finishBatchQuery(request, result)))
-            .exceptionally(exception -> {
-                Platform.runLater(() -> {
-                    this.setQueryInProgress(false, "");
-                    this.setQueryResultMessage(
-                        "\u67e5\u8be2\u5931\u8d25: " + this.readableError(exception),
-                        "-fx-text-fill: #ff6600;");
+        if (this.useNewSystem) {
+            java.util.concurrent.atomic.AtomicInteger legacyDone = new java.util.concurrent.atomic.AtomicInteger(0);
+            java.util.concurrent.atomic.AtomicInteger modernDone = new java.util.concurrent.atomic.AtomicInteger(0);
+            CompletableFuture<QueryBatchResult> legacyFuture = this.legacyBatchService.execute(
+                request,
+                progress -> this.handleDualQueryProgress(
+                    progress, legacyDone, modernDone, totalAttempts));
+            CompletableFuture<QueryBatchResult> modernFuture = this.newSystemBatchService.execute(
+                request,
+                progress -> this.handleDualQueryProgress(
+                    progress, modernDone, legacyDone, totalAttempts));
+            CompletableFuture.allOf(legacyFuture, modernFuture)
+                .thenAccept(ignored -> Platform.runLater(() -> {
+                    this.finishBatchQuery(
+                        request,
+                        this.mergeBatchResults(
+                            request, legacyFuture.join(), modernFuture.join()));
+                }))
+                .exceptionally(exception -> {
+                    Platform.runLater(() -> {
+                        this.setQueryInProgress(false, "");
+                        this.setQueryResultMessage(
+                            "\u67e5\u8be2\u5931\u8d25: " + this.readableError(exception),
+                            "-fx-text-fill: #ff6600;");
+                    });
+                    return null;
                 });
-                return null;
-            });
+        }
+        else {
+            this.legacyBatchService.execute(request, this::handleQueryProgress)
+                .thenAccept(result -> Platform.runLater(() -> this.finishBatchQuery(request, result)))
+                .exceptionally(exception -> {
+                    Platform.runLater(() -> {
+                        this.setQueryInProgress(false, "");
+                        this.setQueryResultMessage(
+                            "\u67e5\u8be2\u5931\u8d25: " + this.readableError(exception),
+                            "-fx-text-fill: #ff6600;");
+                    });
+                    return null;
+                });
+        }
     }
 
     private void handleQueryProgress(QueryProgress progress) {
@@ -1500,6 +1559,81 @@ implements Initializable {
                 "\u5df2\u5b8c\u6210 " + progress.completedAttempts() + "/"
                     + progress.totalAttempts() + suffix);
         });
+    }
+
+    /**
+     * 双系统联合查询的进度回调：两个通道各自上报完成段数，
+     * 界面上显示两边合计的完成数/总数。
+     */
+    private void handleDualQueryProgress(
+        QueryProgress progress,
+        java.util.concurrent.atomic.AtomicInteger selfDone,
+        java.util.concurrent.atomic.AtomicInteger otherDone,
+        int totalAttempts) {
+        selfDone.set(progress.completedAttempts());
+        Platform.runLater(() -> {
+            if (!this.queryActive) {
+                return;
+            }
+            if (progress.success() && !progress.rows().isEmpty()) {
+                this.localEntryCacheService.mergeNetworkEntries(progress.rows());
+                for (WarehouseEntry row : progress.rows()) {
+                    String key = QueryBatchService.dedupKey(row);
+                    if (this.masterEntryKeys.add(key)) {
+                        this.masterEntries.add(row);
+                    }
+                }
+                this.lastRawEntryCount = this.masterEntries.size();
+                this.applyFiltersToView();
+            }
+            String suffix = progress.success()
+                ? ""
+                : "\uff0c\u5931\u8d25: " + progress.identity();
+            this.setQueryInProgress(
+                true,
+                "\u5df2\u5b8c\u6210 " + (selfDone.get() + otherDone.get()) + "/"
+                    + totalAttempts + suffix);
+        });
+    }
+
+    /**
+     * 把老系统和新系统两批查询结果合并为一个结果：
+     * 记录合并后按进仓日期从新到旧排列（空日期排最后），
+     * 日志、分段、失败信息也合并，供快照与统计使用。
+     */
+    private QueryBatchResult mergeBatchResults(
+        QueryBatchRequest request,
+        QueryBatchResult legacy,
+        QueryBatchResult modern) {
+        ArrayList<WarehouseEntry> mergedRows = new ArrayList<WarehouseEntry>();
+        mergedRows.addAll(legacy.rows());
+        mergedRows.addAll(modern.rows());
+        mergedRows.sort((left, right) -> {
+            String leftDate = left.getJcrq() == null ? "" : left.getJcrq().trim();
+            String rightDate = right.getJcrq() == null ? "" : right.getJcrq().trim();
+            if (leftDate.isEmpty() && rightDate.isEmpty()) {
+                return 0;
+            }
+            if (leftDate.isEmpty()) {
+                return 1;
+            }
+            if (rightDate.isEmpty()) {
+                return -1;
+            }
+            return rightDate.compareTo(leftDate);
+        });
+        ArrayList<QuerySegment> mergedSegments = new ArrayList<QuerySegment>(legacy.segments());
+        mergedSegments.addAll(modern.segments());
+        ArrayList<QueryFailure> mergedFailures = new ArrayList<QueryFailure>(legacy.failures());
+        mergedFailures.addAll(modern.failures());
+        return new QueryBatchResult(
+            legacy.batchId() + "+" + modern.batchId(),
+            request,
+            mergedSegments,
+            mergedRows,
+            mergedFailures,
+            legacy.requestLog() + modern.requestLog(),
+            legacy.responseLog() + modern.responseLog());
     }
 
     private void finishBatchQuery(

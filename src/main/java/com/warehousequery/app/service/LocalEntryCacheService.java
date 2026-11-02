@@ -191,7 +191,11 @@ public final class LocalEntryCacheService {
     }
 
     private String buildCacheKey(WarehouseEntry entry) {
-        return this.firstNonBlank(entry.getZyh(), entry.getJczyh(), entry.getJcbh());
+        String key = this.firstNonBlank(entry.getZyh(), entry.getJczyh(), entry.getJcbh());
+        if (entry.getSourceSystem() == 1) {
+            return "new:" + key;
+        }
+        return key;
     }
 
     private boolean isCacheableEntry(WarehouseEntry entry) {
@@ -257,6 +261,7 @@ public final class LocalEntryCacheService {
         record.put("chengzhong", this.sanitize(entry.getChengzhong()));
         record.put("bz2", this.sanitize(entry.getBz2()));
         record.put("hdmc", this.sanitize(entry.getHdmc()));
+        record.put("sourceSystem", entry.getSourceSystem());
         return record;
     }
 

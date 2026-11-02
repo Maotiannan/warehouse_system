@@ -53,6 +53,7 @@ public class WarehouseEntry {
     private final StringProperty bz2 = new SimpleStringProperty("");
     private final StringProperty hdmc = new SimpleStringProperty("");
     private final BooleanProperty selected = new SimpleBooleanProperty(false);
+    private final IntegerProperty sourceSystem = new SimpleIntegerProperty(0);
 
     public String getJcbh() { return jcbh.get(); }
     public StringProperty jcbhProperty() { return jcbh; }
@@ -173,6 +174,9 @@ public class WarehouseEntry {
     public boolean isSelected() { return selected.get(); }
     public BooleanProperty selectedProperty() { return selected; }
     public void setSelected(boolean value) { selected.set(value); }
+    public int getSourceSystem() { return sourceSystem.get(); }
+    public IntegerProperty sourceSystemProperty() { return sourceSystem; }
+    public void setSourceSystem(int value) { sourceSystem.set(value); }
 
     public String getHz() { return hz.get(); }
     public StringProperty hzProperty() { return hz; }

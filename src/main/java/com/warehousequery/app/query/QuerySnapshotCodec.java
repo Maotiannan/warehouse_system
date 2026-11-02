@@ -128,6 +128,7 @@ final class QuerySnapshotCodec {
             .put("chengzhong", safe(row.getChengzhong()))
             .put("bz2", safe(row.getBz2()))
             .put("hdmc", safe(row.getHdmc()))
+            .put("sourceSystem", row.getSourceSystem())
             .put("selected", row.isSelected());
     }
 
@@ -175,6 +176,7 @@ final class QuerySnapshotCodec {
         row.setChengzhong(value.optString("chengzhong", ""));
         row.setBz2(value.optString("bz2", ""));
         row.setHdmc(value.optString("hdmc", ""));
+        row.setSourceSystem(value.optInt("sourceSystem", 0));
         row.setSelected(value.optBoolean("selected", false));
         return row;
     }

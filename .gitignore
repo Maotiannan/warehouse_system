@@ -12,6 +12,8 @@
 *.log
 request_log.txt
 response_log.txt
+request_log-*.txt
+response_log-*.txt
 session_response.html
 
 # IDEs
